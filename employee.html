@@ -94,23 +94,11 @@
     <div class="card-title"><span class="icon">🌆</span>Buổi Chiều</div>
     <div id="afternoonList"></div>
   </div>
-  <div class="card">
-    <div class="card-title"><span class="icon">📋</span>Nhiệm Vụ Phát Sinh</div>
-    <div id="adhocList">
-      <p style="font-size:0.85rem;color:var(--muted)">Chưa có nhiệm vụ phát sinh hôm nay</p>
-    </div>
-  </div>
-  <button class="btn btn-primary" onclick="submitChecklist()" style="width:100%;margin-top:4px">✅ Xác nhận gửi Boss</button>
-</div>
-
-<!-- ── KHO DỤNG CỤ ───────────────────────────────── -->
-<div class="page" id="page-inventory">
+  <!-- ── KIỂM KHO (gộp vào checklist) ───────────────── -->
   <div class="card">
     <div class="card-title"><span class="icon">📦</span>Kiểm Dụng Cụ Đóng Hàng</div>
     <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">Nhập số lượng thực tế đang có. Ô đỏ = dưới mức cảnh báo.</p>
     <div id="supplyList"></div>
-
-    <!-- Kiểm đại diện -->
     <div style="margin-top:14px;padding:12px;background:var(--bg);border-radius:10px;border:1px solid var(--border)">
       <label style="display:flex;align-items:center;gap:8px;font-size:0.88rem;font-weight:600;cursor:pointer">
         <input type="checkbox" id="supplyOnBehalf" onchange="toggleOnBehalf()" style="width:18px;height:18px;accent-color:var(--primary)">
@@ -123,34 +111,19 @@
         </select>
       </div>
     </div>
-
     <button class="btn btn-primary" onclick="submitSupply()" style="margin-top:12px">💾 Lưu Báo Cáo & Gửi Boss</button>
   </div>
 
-  <!-- Loại hàng hoàn -->
+  <!-- ── HÀNG HOÀN VỀ (gộp vào checklist) ─────────── -->
   <div class="card">
     <div class="card-title"><span class="icon">🔄</span>Báo Hàng Hoàn Về</div>
     <div style="display:flex;gap:8px;margin-bottom:16px">
-      <button id="btnReturnTypeCustomer" onclick="switchReturnType('customer')"
-        style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--primary);background:var(--primary);color:white;font-weight:700;font-size:0.82rem;cursor:pointer">
-        👤 Khách trả lại
-      </button>
-      <button id="btnReturnTypeCarrier" onclick="switchReturnType('carrier')"
-        style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--muted);background:white;color:var(--muted);font-weight:700;font-size:0.82rem;cursor:pointer">
-        🚚 Vận chuyển hoàn
-      </button>
+      <button id="btnReturnTypeCustomer" onclick="switchReturnType('customer')" style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--primary);background:var(--primary);color:white;font-weight:700;font-size:0.82rem;cursor:pointer">👤 Khách trả lại</button>
+      <button id="btnReturnTypeCarrier" onclick="switchReturnType('carrier')" style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--muted);background:white;color:var(--muted);font-weight:700;font-size:0.82rem;cursor:pointer">🚚 Vận chuyển hoàn</button>
     </div>
-
-    <!-- Form: Khách trả lại -->
     <div id="returnFormCustomer">
-      <div class="form-group">
-        <label>Mã đơn hàng gốc</label>
-        <input type="text" id="r1_orderId" placeholder="VD: ORD123456">
-      </div>
-      <div class="form-group">
-        <label>Số tiền cần hoàn khách</label>
-        <input type="number" id="r1_amount" placeholder="VD: 250000">
-      </div>
+      <div class="form-group"><label>Mã đơn hàng gốc</label><input type="text" id="r1_orderId" placeholder="VD: ORD123456"></div>
+      <div class="form-group"><label>Số tiền cần hoàn khách</label><input type="number" id="r1_amount" placeholder="VD: 250000"></div>
       <div class="form-group">
         <label>Thông tin nhận CK của khách</label>
         <textarea id="r1_bankInfo" rows="2" placeholder="Ngân hàng, số TK, tên chủ TK..."></textarea>
@@ -172,7 +145,7 @@
         </select>
       </div>
       <div class="form-group">
-        <label>📷 Ảnh hàng khi shipper giao (ảnh từ shipper/app)</label>
+        <label>📷 Ảnh hàng khi shipper giao</label>
         <div class="upload-area" onclick="document.getElementById('r1_photoShipper').click()">
           <div style="font-size:1.5rem">📋</div>
           <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">Chụp màn hình hoặc ảnh shipper gửi</div>
@@ -191,17 +164,9 @@
       </div>
       <button class="btn btn-warning" onclick="submitReturnCustomer()">📥 Ghi Nhận & Gửi Boss</button>
     </div>
-
-    <!-- Form: Vận chuyển hoàn -->
     <div id="returnFormCarrier" style="display:none">
-      <div class="form-group">
-        <label>Số đơn hoàn hôm nay</label>
-        <input type="number" id="r2_count" placeholder="VD: 5" min="1">
-      </div>
-      <div class="form-group">
-        <label>Mã các đơn hoàn (mỗi mã 1 dòng)</label>
-        <textarea id="r2_orderIds" rows="4" placeholder="VD:&#10;VTP123456&#10;GHN789012&#10;..."></textarea>
-      </div>
+      <div class="form-group"><label>Số đơn hoàn hôm nay</label><input type="number" id="r2_count" placeholder="VD: 5" min="1"></div>
+      <div class="form-group"><label>Mã các đơn hoàn (mỗi mã 1 dòng)</label><textarea id="r2_orderIds" rows="4" placeholder="VD:&#10;VTP123456&#10;GHN789012&#10;..."></textarea></div>
       <div class="form-group">
         <label>📷 Ảnh tổng số đơn vận chuyển hoàn về</label>
         <div class="upload-area" onclick="document.getElementById('r2_photoOrders').click()">
@@ -223,7 +188,19 @@
       <button class="btn btn-warning" onclick="submitReturnCarrier()">📥 Ghi Nhận & Gửi Boss</button>
     </div>
   </div>
+
+  <!-- ── NHIỆM VỤ PHÁT SINH ─────────────────────────── -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📋</span>Nhiệm Vụ Phát Sinh</div>
+    <div id="adhocList">
+      <p style="font-size:0.85rem;color:var(--muted)">Chưa có nhiệm vụ phát sinh hôm nay</p>
+    </div>
+  </div>
+  <button class="btn btn-primary" onclick="submitChecklist()" style="width:100%;margin-top:4px">✅ Xác nhận gửi Boss</button>
 </div>
+
+<!-- ── KHO (placeholder để không lỗi switchPage cũ) ── -->
+<div id="page-inventory" style="display:none"></div>
 
 <!-- ── LỊCH LÀM VIỆC ──────────────────────────────── -->
 <div class="page" id="page-overtime">
@@ -432,9 +409,6 @@
   </button>
   <button class="nav-item" onclick="switchPage('checklist',this)">
     <span class="icon">✅</span><span>Checklist</span>
-  </button>
-  <button class="nav-item" onclick="switchPage('inventory',this)">
-    <span class="icon">📦</span><span>Kho</span>
   </button>
   <button class="nav-item" onclick="switchPage('overtime',this)">
     <span class="icon">📅</span><span>Lịch</span>
