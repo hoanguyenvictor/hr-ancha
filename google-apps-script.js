@@ -14,6 +14,20 @@
 const SHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
 const SS = SpreadsheetApp.getActiveSpreadsheet();
 
+// Telegram config
+const TG_TOKEN = '8847651571:AAHPzHQ1eAY6nzztrBoHiSBUnjoTqfDDnYU';
+const TG_CHAT_ID = '7094454303';
+
+function sendTelegram(msg) {
+  try {
+    UrlFetchApp.fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ chat_id: TG_CHAT_ID, text: msg, parse_mode: 'HTML' })
+    });
+  } catch(e) {}
+}
+
 // Tên các sheet (tab)
 const SHEETS = {
   EMPLOYEES: 'Employees',
@@ -377,8 +391,26 @@ function submitSupply(data) {
     reportedBy: reportedBy || empId,
     onBehalfOf: onBehalfOf || '',
   });
+  // Lấy tên nhân viên
+  const emps = sheetData(SHEETS.EMPLOYEES);
+  const emp = emps.find(e => e.id === empId);
+  const empName = emp ? emp.name : empId;
+  const reporterEmp = reportedBy && reportedBy !== empId ? emps.find(e => e.id === reportedBy) : null;
+  const reporterName = reporterEmp ? reporterEmp.name : null;
+
+  // Gửi Telegram
+  const onBehalfNote = reporterName ? `\n👥 Đại diện bởi: <b>${reporterName}</b>` : '';
   if (hasAlert) {
+    const alertItems = Object.entries(supplyData)
+      .filter(([k,v]) => {
+        const cfg = { carton_30x20x10:20, carton_25x20x10:20, carton_15x10x10:20, tape:2, bubble_wrap:2, print_paper:2 };
+        return v !== null && v !== '' && cfg[k] && Number(v) < cfg[k];
+      })
+      .map(([k,v]) => `  • ${k}: còn <b>${v}</b>`).join('\n');
+    sendTelegram(`⚠️ <b>CẢNH BÁO KHO THẤP</b>\n👤 ${empName}${onBehalfNote}\n📅 ${date}\n\nMặt hàng cần bổ sung:\n${alertItems}`);
     log('SUPPLY_ALERT', `${empId} báo kho thấp - ${date}${onBehalfOf ? ' (đại diện bởi ' + reportedBy + ')' : ''}`);
+  } else {
+    sendTelegram(`✅ <b>Báo cáo kho</b>\n👤 ${empName}${onBehalfNote}\n📅 ${date} · ${new Date().toTimeString().slice(0,5)}\nTất cả dụng cụ đủ mức ✔️`);
   }
   return { ok: true };
 }

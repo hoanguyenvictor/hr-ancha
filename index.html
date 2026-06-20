@@ -497,7 +497,22 @@ async function initDashboard() {
   document.getElementById('salaryMonth').textContent = monthKey();
   loadSettings();
   await refreshAll();
-  setInterval(refreshAll, 120000);
+  setInterval(autoRefresh, 300000);
+}
+
+let lastSupplyTime = null;
+async function autoRefresh() {
+  const prevSupplyTime = lastSupplyTime;
+  await refreshAll();
+  // Kiểm tra có báo cáo kho mới không
+  let newSupply = false;
+  employees.forEach(e => {
+    const s = todayReports[e.id]?.supply;
+    if (s && s.time && s.time !== prevSupplyTime) { lastSupplyTime = s.time; newSupply = true; }
+  });
+  if (newSupply && prevSupplyTime !== null) {
+    showToast('📦 Nhân viên vừa cập nhật báo cáo kho!', 'warning');
+  }
 }
 
 async function refreshAll() {
