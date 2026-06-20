@@ -662,10 +662,16 @@ function renderSupplyOverview() {
   };
   const SUPPLY_ALERT = DB_CONFIG.SUPPLY_ALERT;
 
-  // Find latest supply report
+  // Find latest supply report + who reported
   let latestSupply = null;
+  let reporterEmpId = null;
+  let onBehalfOfEmpId = null;
   employees.forEach(e => {
-    if (todayReports[e.id]?.supply) latestSupply = todayReports[e.id].supply;
+    if (todayReports[e.id]?.supply) {
+      latestSupply = todayReports[e.id].supply;
+      reporterEmpId = todayReports[e.id].supply.reportedBy || e.id;
+      onBehalfOfEmpId = todayReports[e.id].supply.onBehalfOf || null;
+    }
   });
 
   if (!latestSupply || !latestSupply.data) {
@@ -674,7 +680,16 @@ function renderSupplyOverview() {
     return;
   }
 
-  const html = Object.entries(SUPPLY_LABELS).map(([key, label]) => {
+  const reporter = employees.find(e => e.id === reporterEmpId);
+  const reporterName = reporter ? reporter.name.split(' ').slice(-1)[0] : reporterEmpId;
+  const onBehalfEmp = onBehalfOfEmpId ? employees.find(e => e.id === onBehalfOfEmpId) : null;
+  const onBehalfName = onBehalfEmp ? onBehalfEmp.name.split(' ').slice(-1)[0] : '';
+
+  const reporterBadge = onBehalfOfEmpId
+    ? `<div style="font-size:0.78rem;color:var(--primary);margin-bottom:8px">👥 <b>${reporterName}</b> kiểm đại diện cho <b>${onBehalfName}</b></div>`
+    : `<div style="font-size:0.78rem;color:var(--muted);margin-bottom:8px">👤 Báo cáo bởi <b>${reporterName}</b></div>`;
+
+  const html = reporterBadge + Object.entries(SUPPLY_LABELS).map(([key, label]) => {
     const qty = latestSupply.data[key];
     const alert = SUPPLY_ALERT[key] || 0;
     const low = qty !== null && qty !== undefined && qty < alert;

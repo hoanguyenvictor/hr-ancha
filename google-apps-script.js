@@ -115,7 +115,7 @@ function initSheet(sheet, name) {
     [SHEETS.EMPLOYEES]:  ['id','name','phone','salary','color','created','passHash'],
     [SHEETS.CHECKIN]:    ['empId','date','checkinTime','checkoutTime','lat','lng','late','lateMin','approved'],
     [SHEETS.CHECKLIST]:  ['empId','date','taskId','done','doneTime'],
-    [SHEETS.SUPPLY]:     ['empId','date','time','carton_nap_gap_35x25x7','carton_nap_gap_20x15x6','carton_doi_khau_40x30x20','carton_doi_khau_35x25x15','carton_doi_khau_12x12x12','hop_dong_ho','hop_vong_tay','bang_dinh','xop_60cm','xop_40cm','giay_in_don','decan_noi','decan_vanh','decan_vua','giay_nen_vua','hasAlert'],
+    [SHEETS.SUPPLY]:     ['empId','date','time','carton_nap_gap_35x25x7','carton_nap_gap_20x15x6','carton_doi_khau_40x30x20','carton_doi_khau_35x25x15','carton_doi_khau_12x12x12','hop_dong_ho','hop_vong_tay','bang_dinh','xop_60cm','xop_40cm','giay_in_don','decan_noi','decan_vanh','decan_vua','giay_nen_vua','hasAlert','reportedBy','onBehalfOf'],
     [SHEETS.SCHEDULE]:   ['empId','weekStart','day','date','shift','eveningStart','eveningEnd','plannedHours','actualHours','status'],
     [SHEETS.OVERTIME]:   ['id','empId','date','start','end','hours','plan','status','approvedBy','approvedAt','resultDesc'],
     [SHEETS.RETURNS]:    ['empId','date','time','orderId','product','qty','condition','photo'],
@@ -359,7 +359,7 @@ function getTodayReports(data) {
 
 // ─── SUPPLY ───────────────────────────────────────────────────────
 function submitSupply(data) {
-  const { empId, date, data: supplyData, hasAlert } = data;
+  const { empId, date, data: supplyData, hasAlert, reportedBy, onBehalfOf } = data;
   appendRow(SHEETS.SUPPLY, {
     empId, date, time: new Date().toTimeString().slice(0,5),
     carton_30x20x10: supplyData.carton_30x20x10 ?? '',
@@ -369,9 +369,11 @@ function submitSupply(data) {
     bubble_wrap: supplyData.bubble_wrap ?? '',
     print_paper: supplyData.print_paper ?? '',
     hasAlert: hasAlert ? 'TRUE' : 'FALSE',
+    reportedBy: reportedBy || empId,
+    onBehalfOf: onBehalfOf || '',
   });
   if (hasAlert) {
-    log('SUPPLY_ALERT', `${empId} báo kho thấp - ${date}`);
+    log('SUPPLY_ALERT', `${empId} báo kho thấp - ${date}${onBehalfOf ? ' (đại diện bởi ' + reportedBy + ')' : ''}`);
   }
   return { ok: true };
 }
