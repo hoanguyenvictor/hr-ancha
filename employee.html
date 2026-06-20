@@ -1544,7 +1544,7 @@ function toBase64(file) {
 async function uploadViaChunks(file, type, label) {
   try {
     const compressed = await compressImage(file, 600, 0.4);
-    const b64 = (await toBase64(compressed)).split(',')[1];
+    const b64 = await toBase64(compressed); // toBase64 đã strip data URL prefix rồi
     const uuid = Math.random().toString(36).substr(2, 9) + Date.now();
     const CHUNK = 3000;
     const chunks = [];
