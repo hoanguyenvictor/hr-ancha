@@ -594,10 +594,20 @@ async function loadTodayData() {
 function renderHome() {
   const d = state.todayData;
 
+  // Xác định ca đăng ký hôm nay: morning / afternoon / full (mặc định full nếu chưa đăng ký)
+  const sched = d.scheduledShift || 'full';
+  const hasMorning   = sched === 'morning'   || sched === 'full';
+  const hasAfternoon = sched === 'afternoon' || sched === 'full';
+
   // Ca Sáng
   const mBtn = document.getElementById('morningBtn');
   const mSt  = document.getElementById('morningStatus');
-  if (d.morningCheckin && d.morningCheckout) {
+  const mWrap = mBtn?.closest('div');
+  if (!hasMorning) {
+    if (mWrap) mWrap.style.opacity = '0.35';
+    mBtn.textContent = '— Không làm'; mBtn.disabled = true;
+    mSt.textContent = 'Không đăng ký';
+  } else if (d.morningCheckin && d.morningCheckout) {
     mSt.textContent  = `✅ ${d.morningCheckin} → ${d.morningCheckout}`;
     mBtn.textContent = '✅ Hoàn thành'; mBtn.disabled = true;
   } else if (d.morningCheckin) {
@@ -606,10 +616,16 @@ function renderHome() {
   } else {
     mSt.textContent = '08:00 – 12:00'; mBtn.textContent = '📍 Check-in'; mBtn.disabled = false;
   }
+
   // Ca Chiều
   const aBtn = document.getElementById('afternoonBtn');
   const aSt  = document.getElementById('afternoonStatus');
-  if (d.afternoonCheckin && d.afternoonCheckout) {
+  const aWrap = aBtn?.closest('div');
+  if (!hasAfternoon) {
+    if (aWrap) aWrap.style.opacity = '0.35';
+    aBtn.textContent = '— Không làm'; aBtn.disabled = true;
+    aSt.textContent = 'Không đăng ký';
+  } else if (d.afternoonCheckin && d.afternoonCheckout) {
     aSt.textContent  = `✅ ${d.afternoonCheckin} → ${d.afternoonCheckout}`;
     aBtn.textContent = '✅ Hoàn thành'; aBtn.disabled = true;
   } else if (d.afternoonCheckin) {
@@ -618,9 +634,16 @@ function renderHome() {
   } else {
     aSt.textContent = '13:00 – 17:30'; aBtn.textContent = '📍 Check-in'; aBtn.disabled = false;
   }
-  // stat
+
+  // stat + kiểm tra hoàn thành
   const ci = d.morningCheckin || d.afternoonCheckin;
   if (ci) document.getElementById('statCheckin').textContent = ci;
+
+  const morningDone    = !hasMorning   || (d.morningCheckin   && d.morningCheckout);
+  const afternoonDone  = !hasAfternoon || (d.afternoonCheckin && d.afternoonCheckout);
+  if (morningDone && afternoonDone && (d.morningCheckin || d.afternoonCheckin)) {
+    document.getElementById('checkinCard').style.background = 'linear-gradient(135deg,#10b981,#059669)';
+  }
 
   // Checklist progress
   const allTasks = [...MORNING_TASKS, ...AFTERNOON_TASKS];

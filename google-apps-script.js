@@ -370,6 +370,10 @@ function getTodayData(data) {
   const checklists = sheetData(SHEETS.CHECKLIST).filter(r => r.empId===empId && r.date===date);
   const supplies = sheetData(SHEETS.SUPPLY).filter(r => r.empId===empId && r.date===date);
 
+  // Lịch đã đăng ký hôm nay
+  const todaySchedule = sheetData(SHEETS.SCHEDULE).find(r => r.empId === empId && r.date === date);
+  const scheduledShift = todaySchedule ? (todaySchedule.shift || 'full') : 'full';
+
   const checklist = {};
   checklists.forEach(r => { checklist[r.taskId] = r.done === 'TRUE'; });
 
@@ -380,13 +384,13 @@ function getTodayData(data) {
   return {
     ok: true,
     data: {
+      scheduledShift,
       morningCheckin:    morning.checkinTime   || null,
       morningCheckout:   morning.checkoutTime  || null,
       morningLate:       morning.late === 'TRUE',
       afternoonCheckin:  afternoon.checkinTime  || null,
       afternoonCheckout: afternoon.checkoutTime || null,
       afternoonLate:     afternoon.late === 'TRUE',
-      // compat cũ
       checkin:  morning.checkinTime  || afternoon.checkinTime  || null,
       checkout: morning.checkoutTime || afternoon.checkoutTime || null,
       checklist,
