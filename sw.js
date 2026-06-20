@@ -1,4 +1,4 @@
-const CACHE = 'hr-v2';
+const CACHE = 'hr-v3';
 const ASSETS = ['/index.html', '/employee.html', '/style.css', '/db.js', '/manifest.json'];
 
 // Cài đặt: cache toàn bộ static files
