@@ -173,11 +173,13 @@ function log(action, detail) {
 
 // ─── AUTH ─────────────────────────────────────────────────────────
 function handleLogin(data) {
-  const { code, pass } = data;
+  const { code, passHash, pass } = data;
   const employees = sheetData(SHEETS.EMPLOYEES);
   const emp = employees.find(e => e.id === code);
   if (!emp) return { ok: false, error: 'Không tìm thấy nhân viên' };
-  if (emp.passHash !== hashPass(pass)) return { ok: false, error: 'Sai mật khẩu' };
+  // Nhận passHash từ client (đã hash SHA-256), hoặc hash pass cũ để tương thích
+  const clientHash = passHash || hashPass(pass || '');
+  if (emp.passHash !== clientHash) return { ok: false, error: 'Sai mật khẩu' };
   return { ok: true, user: { id: emp.id, name: emp.name, phone: emp.phone, color: emp.color } };
 }
 
@@ -190,10 +192,12 @@ function getEmployees() {
 }
 
 function addEmployee(data) {
-  const { emp, pass } = data;
+  const { emp, passHash, pass } = data;
   const existing = sheetData(SHEETS.EMPLOYEES);
   if (existing.find(e => e.id === emp.id)) return { ok: false, error: 'Mã NV đã tồn tại' };
-  appendRow(SHEETS.EMPLOYEES, { ...emp, passHash: hashPass(pass) });
+  // Nhận passHash từ client, hoặc hash pass cũ để tương thích
+  const storedHash = passHash || hashPass(pass || '');
+  appendRow(SHEETS.EMPLOYEES, { ...emp, passHash: storedHash });
   return { ok: true };
 }
 

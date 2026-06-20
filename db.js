@@ -95,11 +95,15 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
 
 async function checkInOffice() {
   const pos = await getGPS();
+  // Yêu cầu GPS phải chính xác trong vòng 80m
+  if (pos.coords.accuracy > 80) {
+    return { ok: false, distance: 0, error: `GPS chưa ổn định (độ chính xác: ${Math.round(pos.coords.accuracy)}m). Vui lòng thử lại!` };
+  }
   const dist = haversineDistance(
     pos.coords.latitude, pos.coords.longitude,
     DB_CONFIG.OFFICE_LAT, DB_CONFIG.OFFICE_LNG
   );
-  return { ok: dist <= DB_CONFIG.OFFICE_RADIUS_M, distance: Math.round(dist) };
+  return { ok: dist <= DB_CONFIG.OFFICE_RADIUS_M, distance: Math.round(dist), lat: pos.coords.latitude, lng: pos.coords.longitude };
 }
 
 // ── AUTH ───────────────────────────────────────────────

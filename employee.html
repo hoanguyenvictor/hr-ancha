@@ -612,7 +612,7 @@ async function doCheckin() {
   try {
     const gps = await checkInOffice();
     if (!gps.ok) {
-      showToast(`❌ Bạn cách văn phòng ${gps.distance}m (cần trong ${DB_CONFIG.OFFICE_RADIUS_M}m)`, 'danger');
+      showToast(gps.error || `❌ Bạn cách văn phòng ${gps.distance}m (cần trong ${DB_CONFIG.OFFICE_RADIUS_M}m)`, 'danger');
       btn.disabled = false;
       btn.textContent = '📍 Check-in Văn Phòng';
       return;
@@ -663,7 +663,7 @@ async function doCheckout() {
   try {
     const gps = await checkInOffice();
     if (!gps.ok) {
-      showToast(`❌ Bạn cách văn phòng ${gps.distance}m — phải check-out tại văn phòng!`, 'danger');
+      showToast(gps.error || `❌ Bạn cách văn phòng ${gps.distance}m — phải check-out tại văn phòng!`, 'danger');
       btn.disabled = false;
       btn.textContent = '🏁 Check-out';
       return;
@@ -1291,12 +1291,18 @@ function toBase64(file) {
 }
 
 // ─── LOGIN ─────────────────────────────────────────────
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
 async function doLogin() {
   const code = document.getElementById('loginCode').value.trim().toUpperCase();
   const pass = document.getElementById('loginPass').value;
   if (!code || !pass) { document.getElementById('loginError').textContent = 'Nhập đầy đủ thông tin!'; return; }
 
-  const res = await apiCall('login', { code, pass });
+  const passHash = await sha256(pass);
+  const res = await apiCall('login', { code, passHash });
   if (res.ok && res.user) {
     setCurrentUser(res.user);
     document.getElementById('loginModal').classList.add('hidden');
