@@ -1383,6 +1383,7 @@ function switchPage(name, btn) {
     const navBtns = { home: 0, checklist: 1, inventory: 2, overtime: 3, diary: 4, salary: 5, settings: 6 };
     document.querySelectorAll('.nav-item')[navBtns[name] ?? 0].classList.add('active');
   }
+  if (name === 'overtime') renderSchedule();
   if (name === 'salary') renderSalary();
   if (name === 'settings') renderSettingsPage();
   if (name === 'emp-notifications') loadEmpNotifications();
