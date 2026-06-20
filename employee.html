@@ -819,14 +819,19 @@ function checkSupplyAlert(input, key) {
   }
 }
 
-function toggleOnBehalf() {
+async function toggleOnBehalf() {
   const checked = document.getElementById('supplyOnBehalf').checked;
   document.getElementById('onBehalfSelect').style.display = checked ? 'block' : 'none';
   if (checked) {
     const sel = document.getElementById('onBehalfEmp');
+    sel.innerHTML = '<option value="">⏳ Đang tải...</option>';
+    const res = await apiCall('getEmployees');
+    const others = (res.ok && res.data ? res.data : []).filter(e => e.id !== state.user.id);
+    if (!others.length) {
+      sel.innerHTML = '<option value="">Không có đồng nghiệp</option>';
+      return;
+    }
     sel.innerHTML = '<option value="">-- Chọn đồng nghiệp --</option>';
-    const others = (JSON.parse(localStorage.getItem('employees') || '[]'))
-      .filter(e => e.id !== state.user.id);
     others.forEach(e => {
       sel.innerHTML += `<option value="${e.id}">${e.name}</option>`;
     });
