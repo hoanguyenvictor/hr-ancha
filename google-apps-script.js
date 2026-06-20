@@ -64,12 +64,17 @@ function checkDailyAttendance() {
     }
   });
 
-  // Gửi tổng kết về Telegram cho Boss
-  if (violations.length > 0) {
-    sendTelegram(`🔔 <b>Tổng kết chấm công ${date}</b>\n\n${violations.join('\n')}\n\n💸 Mỗi vi phạm trừ <b>50.000đ</b> thưởng chuyên cần`);
-  } else {
-    sendTelegram(`✅ <b>Chấm công ${date}</b> — Toàn bộ nhân viên hoàn thành đúng giờ!`);
+  // Ghi tổng kết vào sheet BossNotifications để hiển thị trong app
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let nSheet = ss.getSheetByName('BossNotifications');
+  if (!nSheet) {
+    nSheet = ss.insertSheet('BossNotifications');
+    nSheet.appendRow(['date','type','message','read']);
   }
+  const msg = violations.length > 0
+    ? `Tổng kết chấm công ${date}:\n${violations.join('\n')}\n💸 Mỗi vi phạm trừ 50.000đ thưởng chuyên cần`
+    : `✅ Chấm công ${date} — Toàn bộ nhân viên hoàn thành đúng giờ!`;
+  nSheet.appendRow([date, 'attendance', msg, 'false']);
 }
 
 function sendTelegramPhoto(driveUrl, caption) {
@@ -180,6 +185,8 @@ function doGet(e) {
       case 'getAllSubmissions':      result = { ok: true, data: sheetData(SHEETS.SUBMISSIONS) }; break;
       case 'getAllSupply':           result = { ok: true, data: sheetData(SHEETS.SUPPLY) }; break;
       case 'getAllReturns':          result = { ok: true, data: sheetData(SHEETS.RETURN_SUBS) }; break;
+      case 'getBossNotifications':  result = getBossNotifications(); break;
+      case 'markBossNotifRead':     result = markBossNotifRead(data); break;
       case 'getPendingReturns':     result = getPendingReturns(data); break;
       case 'confirmReturn':         result = confirmReturn(data); break;
       case 'getMyReturns':          result = getMyReturns(data); break;
@@ -1168,5 +1175,33 @@ function reviewSubmission(data) {
     const empName = emp ? emp.name : empId;
     sendTelegram(`⚠️ <b>Checklist không đạt</b>\n👤 ${empName} bị trừ <b>50.000đ</b>\n📅 ${date}`);
   }
+  return { ok: true };
+}
+
+function getBossNotifications() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('BossNotifications');
+  if (!sheet) return { ok: true, data: [] };
+  const vals = sheet.getDataRange().getValues();
+  if (vals.length <= 1) return { ok: true, data: [] };
+  const headers = vals[0];
+  const rows = vals.slice(1).map((r, i) => {
+    const obj = {};
+    headers.forEach((h, j) => obj[h] = r[j]);
+    obj._row = i + 2;
+    return obj;
+  });
+  // Trả 30 ngày gần nhất, mới nhất lên đầu
+  return { ok: true, data: rows.reverse().slice(0, 30) };
+}
+
+function markBossNotifRead(data) {
+  const { row } = data;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('BossNotifications');
+  if (!sheet || !row) return { ok: true };
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const readCol = headers.indexOf('read') + 1;
+  if (readCol > 0) sheet.getRange(row, readCol).setValue('true');
   return { ok: true };
 }

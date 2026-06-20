@@ -302,6 +302,10 @@
     <div class="card-title"><span class="icon">🔔</span>Thông Báo Chờ Xác Nhận</div>
     <div id="notifList"><p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p></div>
   </div>
+  <div class="card" style="margin-top:12px">
+    <div class="card-title"><span class="icon">📋</span>Báo Cáo Chấm Công Tự Động</div>
+    <div id="attendanceReportList"><p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p></div>
+  </div>
 </div>
 
 <div id="page-photos" style="display:none"></div>
@@ -1257,7 +1261,7 @@ function switchPage(name, btn) {
   if (name === 'salary') renderSalaryTab();
   if (name === 'schedule') renderScheduleTab();
   if (name === 'photos') renderPhotosTab();
-  if (name === 'notifications') loadNotifications();
+  if (name === 'notifications') { loadNotifications(); loadAttendanceReports(); }
   if (name === 'diary') { window._bossDiaryFilter = window._bossDiaryFilter || 'day'; loadBossDiary(); }
 }
 
@@ -1407,6 +1411,32 @@ async function loadNotifications() {
   }).join('');
 
   el.innerHTML = checklistHTML + returnsHTML;
+}
+
+async function loadAttendanceReports() {
+  const el = document.getElementById('attendanceReportList');
+  if (!el) return;
+  el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p>';
+  const res = await apiCall('getBossNotifications', {});
+  if (!res.ok || !res.data.length) {
+    el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:16px">Chưa có báo cáo nào</p>';
+    return;
+  }
+  el.innerHTML = res.data.map(n => {
+    const isGood = n.message.startsWith('✅');
+    const isUnread = n.read === 'false' || n.read === false;
+    return `<div style="padding:12px;border-radius:10px;margin-bottom:8px;background:${isUnread ? 'rgba(99,102,241,0.08)' : 'rgba(0,0,0,0.03)'};border-left:3px solid ${isGood ? '#10b981' : '#f59e0b'}">
+      <div style="font-size:0.75rem;color:var(--muted);margin-bottom:4px">${n.date}</div>
+      <div style="font-size:0.83rem;white-space:pre-line;line-height:1.5">${n.message}</div>
+      ${isUnread ? `<button onclick="markNotifRead(${n._row}, this)" style="margin-top:8px;padding:4px 12px;font-size:0.75rem;border:none;border-radius:6px;background:var(--primary);color:#fff;cursor:pointer">Đã đọc</button>` : '<div style="font-size:0.72rem;color:var(--muted);margin-top:4px">✓ Đã đọc</div>'}
+    </div>`;
+  }).join('');
+}
+
+async function markNotifRead(row, btn) {
+  await apiCall('markBossNotifRead', { row });
+  btn.parentElement.querySelector('button')?.remove();
+  btn.outerHTML = '<div style="font-size:0.72rem;color:var(--muted);margin-top:4px">✓ Đã đọc</div>';
 }
 
 async function reviewSubmission(id, empId, date, approved) {
