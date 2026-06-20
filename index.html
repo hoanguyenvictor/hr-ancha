@@ -515,16 +515,22 @@ async function autoRefresh() {
 }
 
 async function refreshAll() {
-  await Promise.all([
-    loadEmployees(),
-    loadTodayReports(),
-    loadOvertimeRequests(),
-    loadSalaryData(),
-  ]);
-  renderOverview();
-  renderEmployeeList();
-  renderOvertimeTab();
-  renderSalaryTab();
+  try {
+    await Promise.all([
+      loadEmployees(),
+      loadTodayReports(),
+      loadOvertimeRequests(),
+      loadSalaryData(),
+    ]);
+    renderOverview();
+    renderEmployeeList();
+    renderOvertimeTab();
+    renderSalaryTab();
+    showToast('✅ Đã cập nhật dữ liệu', 'success');
+  } catch(err) {
+    showToast('❌ Lỗi: ' + err.message, 'error');
+    alert('DEBUG LỖI: ' + err.message + '\n' + err.stack);
+  }
 }
 
 // ─── DATA LOADING ──────────────────────────────────────
