@@ -100,6 +100,7 @@
       <p style="font-size:0.85rem;color:var(--muted)">Chưa có nhiệm vụ phát sinh hôm nay</p>
     </div>
   </div>
+  <button class="btn btn-primary" onclick="submitChecklist()" style="width:100%;margin-top:4px">✅ Xác nhận gửi Boss</button>
 </div>
 
 <!-- ── KHO DỤNG CỤ ───────────────────────────────── -->
@@ -773,21 +774,34 @@ function taskHTML(t) {
   </div>`;
 }
 
-async function toggleTask(id) {
+function toggleTask(id) {
   state.checklistState[id] = !state.checklistState[id];
-  const doneTime = state.checklistState[id] ? nowTime() : null;
-
-  // Update UI ngay
   const el = document.getElementById(`task_${id}`);
   if (el) {
     el.className = `checklist-item ${state.checklistState[id]?'done':''}`;
     el.querySelector('.check-circle').textContent = state.checklistState[id] ? '✓' : '';
   }
+  renderHome();
+}
 
-  // Save
+async function submitChecklist() {
+  const allTasks = [...MORNING_TASKS, ...AFTERNOON_TASKS];
+  const doneTasks = allTasks.filter(t => state.checklistState[t.id]);
+  if (doneTasks.length === 0) { showToast('Chưa tick việc nào!', 'warning'); return; }
+
+  const doneTime = nowTime();
+  await Promise.all(doneTasks.map(t =>
+    apiCall('updateChecklist', { empId: state.user.id, date: today(), taskId: t.id, done: true, doneTime })
+  ));
+  // Lưu các việc chưa tick là false
+  const undoneTasks = allTasks.filter(t => !state.checklistState[t.id]);
+  await Promise.all(undoneTasks.map(t =>
+    apiCall('updateChecklist', { empId: state.user.id, date: today(), taskId: t.id, done: false, doneTime: null })
+  ));
+
   state.todayData.checklist = state.checklistState;
   localStorage.setItem(`todayData_${today()}`, JSON.stringify(state.todayData));
-  await apiCall('updateChecklist', { empId: state.user.id, date: today(), taskId: id, done: state.checklistState[id], doneTime });
+  showToast(`✅ Đã gửi ${doneTasks.length}/${allTasks.length} việc cho Boss!`, 'success');
   renderHome();
 }
 
