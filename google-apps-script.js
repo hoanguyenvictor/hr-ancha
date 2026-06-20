@@ -18,6 +18,60 @@ const SS = SpreadsheetApp.getActiveSpreadsheet();
 const TG_TOKEN = '8847651571:AAHPzHQ1eAY6nzztrBoHiSBUnjoTqfDDnYU';
 const TG_CHAT_ID = '7094454303';
 
+// ─── DAILY ATTENDANCE CHECK — chạy tự động 23h30 mỗi ngày ──────────
+function checkDailyAttendance() {
+  const tz = Session.getScriptTimeZone();
+  const date = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  const month = date.slice(0, 7);
+
+  const employees = sheetData(SHEETS.EMPLOYEES).filter(e => e.role !== 'boss' && e.id);
+  const schedules = sheetData(SHEETS.SCHEDULE).filter(r => r.date === date);
+  const checkins  = sheetData(SHEETS.CHECKIN).filter(r => r.date === date);
+
+  const violations = [];
+
+  employees.forEach(emp => {
+    const sched = schedules.find(r => String(r.empId) === String(emp.id));
+    const shift = sched ? (sched.shift || 'fullday') : 'fullday';
+
+    // Ngày nghỉ đã đăng ký → bỏ qua
+    if (shift === 'off') return;
+
+    const needMorning   = shift === 'morning'   || shift === 'fullday' || shift === 'full';
+    const needAfternoon = shift === 'afternoon'  || shift === 'fullday' || shift === 'full';
+
+    const morningRow   = checkins.find(r => String(r.empId) === String(emp.id) && (r.shift || 'morning') === 'morning');
+    const afternoonRow = checkins.find(r => String(r.empId) === String(emp.id) && r.shift === 'afternoon');
+
+    // Kiểm tra từng ca
+    if (needMorning) {
+      if (!morningRow) {
+        addAutoPenalty(emp.id, date, 'Không check-in ca sáng', 'Vắng mặt ca sáng');
+        violations.push(`❌ ${emp.name} — Không check-in ca sáng`);
+      } else if (!morningRow.checkoutTime) {
+        addAutoPenalty(emp.id, date, 'Không check-out ca sáng', 'Thiếu check-out ca sáng');
+        violations.push(`⚠️ ${emp.name} — Không check-out ca sáng`);
+      }
+    }
+    if (needAfternoon) {
+      if (!afternoonRow) {
+        addAutoPenalty(emp.id, date, 'Không check-in ca chiều', 'Vắng mặt ca chiều');
+        violations.push(`❌ ${emp.name} — Không check-in ca chiều`);
+      } else if (!afternoonRow.checkoutTime) {
+        addAutoPenalty(emp.id, date, 'Không check-out ca chiều', 'Thiếu check-out ca chiều');
+        violations.push(`⚠️ ${emp.name} — Không check-out ca chiều`);
+      }
+    }
+  });
+
+  // Gửi tổng kết về Telegram cho Boss
+  if (violations.length > 0) {
+    sendTelegram(`🔔 <b>Tổng kết chấm công ${date}</b>\n\n${violations.join('\n')}\n\n💸 Mỗi vi phạm trừ <b>50.000đ</b> thưởng chuyên cần`);
+  } else {
+    sendTelegram(`✅ <b>Chấm công ${date}</b> — Toàn bộ nhân viên hoàn thành đúng giờ!`);
+  }
+}
+
 function sendTelegramPhoto(driveUrl, caption) {
   if (!driveUrl) return;
   try {
