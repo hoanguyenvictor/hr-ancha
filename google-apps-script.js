@@ -275,27 +275,42 @@ function addEmployee(data) {
 
 // ─── CHECKIN ──────────────────────────────────────────────────────
 function handleCheckin(data) {
-  const { empId, date, time, late, lateMin } = data;
-  // Xoá nếu đã tồn tại hôm nay
-  const sheet = getSheet(SHEETS.CHECKIN);
-  const vals = sheet.getDataRange().getValues();
-  for (let i = vals.length - 1; i >= 1; i--) {
-    if (vals[i][0] === empId && vals[i][1] === date) {
-      // Đã check-in rồi, không ghi đè
-      return { ok: false, error: 'Đã check-in rồi' };
-    }
-  }
-  appendRow(SHEETS.CHECKIN, { empId, date, checkinTime: time, late: late?'TRUE':'FALSE', lateMin: lateMin||0 });
-  log('checkin', `${empId} - ${date} ${time}${late?' TRỄ '+lateMin+'p':''}`);
-  if (late) addAutoPenalty(empId, date, 'late', `Đi muộn ${lateMin} phút`);
+  const { empId, date, time, shift, late, lateMin } = data;
+  const shiftKey = shift || 'morning';
+  // Mỗi ca lưu 1 dòng riêng — key: empId + date + shift
+  const rows = sheetData(SHEETS.CHECKIN);
+  const exists = rows.find(r => r.empId === empId && r.date === date && (r.shift || 'morning') === shiftKey);
+  if (exists) return { ok: false, error: 'Đã check-in ca này rồi' };
+  appendRow(SHEETS.CHECKIN, { empId, date, shift: shiftKey, checkinTime: time, late: late?'TRUE':'FALSE', lateMin: lateMin||0 });
+  log('checkin', `${empId} - ${date} ${shiftKey} ${time}${late?' TRỄ '+lateMin+'p':''}`);
+  if (late) addAutoPenalty(empId, date, 'late_'+shiftKey, `Đi muộn ca ${shiftKey} ${lateMin} phút`);
   return { ok: true };
 }
 
 function handleCheckout(data) {
-  const { empId, date, time, early, earlyMin } = data;
-  updateRow(SHEETS.CHECKIN, 'empId', empId, { checkoutTime: time, early: early?'TRUE':'FALSE', earlyMin: earlyMin||0 });
-  log('checkout', `${empId} - ${date} ${time}${early?' VỀ SỚM '+earlyMin+'p':''}`);
-  if (early) addAutoPenalty(empId, date, 'early', `Về sớm ${earlyMin} phút`);
+  const { empId, date, time, shift, early, earlyMin } = data;
+  const shiftKey = shift || 'morning';
+  // Cập nhật đúng dòng theo ca
+  const sheet = getSheet(SHEETS.CHECKIN);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const shiftIdx = headers.indexOf('shift');
+  const empIdx = headers.indexOf('empId');
+  const dateIdx = headers.indexOf('date');
+  for (let i = 1; i < vals.length; i++) {
+    const rowShift = shiftIdx >= 0 ? (vals[i][shiftIdx] || 'morning') : 'morning';
+    if (vals[i][empIdx] === empId && vals[i][dateIdx] === date && rowShift === shiftKey) {
+      const coIdx = headers.indexOf('checkoutTime');
+      const earlyIdx = headers.indexOf('early');
+      const earlyMinIdx = headers.indexOf('earlyMin');
+      if (coIdx >= 0) sheet.getRange(i+1, coIdx+1).setValue(time);
+      if (earlyIdx >= 0) sheet.getRange(i+1, earlyIdx+1).setValue(early?'TRUE':'FALSE');
+      if (earlyMinIdx >= 0) sheet.getRange(i+1, earlyMinIdx+1).setValue(earlyMin||0);
+      break;
+    }
+  }
+  log('checkout', `${empId} - ${date} ${shiftKey} ${time}${early?' VỀ SỚM '+earlyMin+'p':''}`);
+  if (early) addAutoPenalty(empId, date, 'early_'+shiftKey, `Về sớm ca ${shiftKey} ${earlyMin} phút`);
   return { ok: true };
 }
 
@@ -358,16 +373,22 @@ function getTodayData(data) {
   const checklist = {};
   checklists.forEach(r => { checklist[r.taskId] = r.done === 'TRUE'; });
 
-  const ci = checkins[0] || {};
+  const morning   = checkins.find(r => (r.shift||'morning') === 'morning') || {};
+  const afternoon = checkins.find(r => r.shift === 'afternoon') || {};
   const sup = supplies[0] || null;
 
   return {
     ok: true,
     data: {
-      checkin: ci.checkinTime || null,
-      checkout: ci.checkoutTime || null,
-      late: ci.late === 'TRUE',
-      lateMin: Number(ci.lateMin) || 0,
+      morningCheckin:    morning.checkinTime   || null,
+      morningCheckout:   morning.checkoutTime  || null,
+      morningLate:       morning.late === 'TRUE',
+      afternoonCheckin:  afternoon.checkinTime  || null,
+      afternoonCheckout: afternoon.checkoutTime || null,
+      afternoonLate:     afternoon.late === 'TRUE',
+      // compat cũ
+      checkin:  morning.checkinTime  || afternoon.checkinTime  || null,
+      checkout: morning.checkoutTime || afternoon.checkoutTime || null,
       checklist,
       supply: sup ? {
         data: {

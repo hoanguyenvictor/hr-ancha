@@ -37,10 +37,24 @@
   <div class="checkin-big" id="checkinCard">
     <div class="checkin-time" id="liveClock">00:00</div>
     <div class="checkin-date" id="liveDate"></div>
-    <div class="checkin-status" id="checkinStatus">Chưa check-in hôm nay</div>
-    <button class="btn" id="checkinBtn" style="background:white;color:var(--primary);font-weight:700" onclick="doCheckin()">
-      📍 Check-in Văn Phòng
-    </button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px">
+      <!-- Ca Sáng -->
+      <div style="background:rgba(255,255,255,0.15);border-radius:14px;padding:12px;text-align:center">
+        <div style="font-size:0.78rem;font-weight:700;opacity:0.9;margin-bottom:6px">☀️ CA SÁNG</div>
+        <div style="font-size:0.75rem;opacity:0.8;margin-bottom:8px" id="morningStatus">08:00 – 12:00</div>
+        <button class="btn" id="morningBtn" style="background:white;color:var(--primary);font-weight:700;width:100%;padding:8px;font-size:0.82rem" onclick="doShiftAction('morning')">
+          📍 Check-in
+        </button>
+      </div>
+      <!-- Ca Chiều -->
+      <div style="background:rgba(255,255,255,0.15);border-radius:14px;padding:12px;text-align:center">
+        <div style="font-size:0.78rem;font-weight:700;opacity:0.9;margin-bottom:6px">🌆 CA CHIỀU</div>
+        <div style="font-size:0.75rem;opacity:0.8;margin-bottom:8px" id="afternoonStatus">13:00 – 17:30</div>
+        <button class="btn" id="afternoonBtn" style="background:white;color:var(--primary);font-weight:700;width:100%;padding:8px;font-size:0.82rem" onclick="doShiftAction('afternoon')">
+          📍 Check-in
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Thống kê nhanh -->
@@ -563,7 +577,7 @@ function updateClock() {
 async function loadTodayData() {
   // Load từ localStorage trước (offline), sau đó sync
   const cached = JSON.parse(localStorage.getItem(`todayData_${today()}`) || 'null');
-  state.todayData = cached || { checkin: null, checkout: null, checklist: {}, supply: null };
+  state.todayData = cached || { morningCheckin: null, morningCheckout: null, afternoonCheckin: null, afternoonCheckout: null, checkin: null, checkout: null, checklist: {}, supply: null };
   state.checklistState = state.todayData.checklist || {};
 
   try {
@@ -580,14 +594,33 @@ async function loadTodayData() {
 function renderHome() {
   const d = state.todayData;
 
-  // Check-in status
-  if (d.checkin) {
-    document.getElementById('checkinStatus').textContent = `✅ Đã check-in lúc ${d.checkin}${d.late ? ' (trễ ' + d.lateMin + ' phút)' : ''}`;
-    document.getElementById('checkinBtn').textContent = d.checkout ? '✅ Đã check-out' : '🏁 Check-out';
-    document.getElementById('checkinBtn').onclick = d.checkout ? null : doCheckout;
-    document.getElementById('checkinBtn').disabled = !!d.checkout;
-    document.getElementById('statCheckin').textContent = d.checkin;
+  // Ca Sáng
+  const mBtn = document.getElementById('morningBtn');
+  const mSt  = document.getElementById('morningStatus');
+  if (d.morningCheckin && d.morningCheckout) {
+    mSt.textContent  = `✅ ${d.morningCheckin} → ${d.morningCheckout}`;
+    mBtn.textContent = '✅ Hoàn thành'; mBtn.disabled = true;
+  } else if (d.morningCheckin) {
+    mSt.textContent  = `✅ Vào: ${d.morningCheckin}`;
+    mBtn.textContent = '🏁 Check-out'; mBtn.style.color = 'var(--warning)';
+  } else {
+    mSt.textContent = '08:00 – 12:00'; mBtn.textContent = '📍 Check-in'; mBtn.disabled = false;
   }
+  // Ca Chiều
+  const aBtn = document.getElementById('afternoonBtn');
+  const aSt  = document.getElementById('afternoonStatus');
+  if (d.afternoonCheckin && d.afternoonCheckout) {
+    aSt.textContent  = `✅ ${d.afternoonCheckin} → ${d.afternoonCheckout}`;
+    aBtn.textContent = '✅ Hoàn thành'; aBtn.disabled = true;
+  } else if (d.afternoonCheckin) {
+    aSt.textContent  = `✅ Vào: ${d.afternoonCheckin}`;
+    aBtn.textContent = '🏁 Check-out'; aBtn.style.color = 'var(--warning)';
+  } else {
+    aSt.textContent = '13:00 – 17:30'; aBtn.textContent = '📍 Check-in'; aBtn.disabled = false;
+  }
+  // stat
+  const ci = d.morningCheckin || d.afternoonCheckin;
+  if (ci) document.getElementById('statCheckin').textContent = ci;
 
   // Checklist progress
   const allTasks = [...MORNING_TASKS, ...AFTERNOON_TASKS];
@@ -665,6 +698,58 @@ function calcBonus() {
 }
 
 // ─── CHECK-IN / CHECK-OUT ──────────────────────────────
+async function doShiftAction(shift) {
+  const btnId = shift === 'morning' ? 'morningBtn' : 'afternoonBtn';
+  const btn = document.getElementById(btnId);
+  const d = state.todayData;
+  const isCheckin = shift === 'morning' ? !d.morningCheckin : !d.afternoonCheckin;
+
+  btn.disabled = true;
+  btn.textContent = '📡 Đang xác định vị trí...';
+
+  try {
+    const gps = await checkInOffice();
+    if (!gps.ok) {
+      showToast(gps.error || `❌ Bạn cách văn phòng ${gps.distance}m (cần trong ${DB_CONFIG.OFFICE_RADIUS_M}m)`, 'danger');
+      btn.disabled = false;
+      btn.textContent = isCheckin ? '📍 Check-in' : '🏁 Check-out';
+      return;
+    }
+    const timeStr = nowTime();
+    if (isCheckin) {
+      // Tính trễ
+      const startStr = shift === 'morning' ? DB_CONFIG.MORNING_START : DB_CONFIG.AFTERNOON_START;
+      const [sh, sm] = startStr.split(':').map(Number);
+      const [ch, cm] = timeStr.split(':').map(Number);
+      const diffMin = (ch*60+cm) - (sh*60+sm);
+      const late = diffMin > DB_CONFIG.LATE_GRACE_MINUTES;
+      await apiCall('checkin', { empId: state.user.id, date: today(), time: timeStr, shift,
+        lat: gps.lat, lng: gps.lng, late, lateMin: Math.max(0, diffMin) });
+      if (shift === 'morning') { d.morningCheckin = timeStr; d.morningLate = late; }
+      else { d.afternoonCheckin = timeStr; d.afternoonLate = late; }
+      showToast(late ? `⚠️ Check-in ${shift==='morning'?'sáng':'chiều'} lúc ${timeStr} — trễ ${diffMin} phút` : `✅ Check-in ${shift==='morning'?'sáng':'chiều'} ${timeStr} — Đúng giờ!`, late ? 'warning' : 'success');
+    } else {
+      // Check-out
+      const endStr = shift === 'morning' ? DB_CONFIG.MORNING_END : DB_CONFIG.AFTERNOON_END;
+      const [eh, em2] = endStr.split(':').map(Number);
+      const [ch, cm] = timeStr.split(':').map(Number);
+      const earlyMin = (eh*60+em2) - (ch*60+cm);
+      const early = earlyMin > DB_CONFIG.LATE_GRACE_MINUTES;
+      await apiCall('checkout', { empId: state.user.id, date: today(), time: timeStr, shift,
+        lat: gps.lat, lng: gps.lng, early, earlyMin: Math.max(0, earlyMin) });
+      if (shift === 'morning') d.morningCheckout = timeStr;
+      else d.afternoonCheckout = timeStr;
+      showToast(`✅ Check-out ${shift==='morning'?'sáng':'chiều'} lúc ${timeStr}`, 'success');
+    }
+    localStorage.setItem(`todayData_${today()}`, JSON.stringify(d));
+    renderHome();
+  } catch(e) {
+    showToast('❌ Không lấy được GPS. Bật GPS và thử lại.', 'danger');
+    btn.disabled = false;
+    btn.textContent = isCheckin ? '📍 Check-in' : '🏁 Check-out';
+  }
+}
+
 async function doCheckin() {
   const btn = document.getElementById('checkinBtn');
   btn.disabled = true;
