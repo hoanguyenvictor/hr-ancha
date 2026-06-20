@@ -594,10 +594,27 @@ async function loadTodayData() {
 function renderHome() {
   const d = state.todayData;
 
-  // Xác định ca đăng ký hôm nay: morning / afternoon / full (mặc định full nếu chưa đăng ký)
   const sched = d.scheduledShift || 'full';
-  const hasMorning   = sched === 'morning'   || sched === 'full';
-  const hasAfternoon = sched === 'afternoon' || sched === 'full';
+
+  // Ngày nghỉ — ẩn cả 2 nút, hiện thông báo nghỉ
+  if (sched === 'off') {
+    document.getElementById('morningBtn').closest('div').style.display  = 'none';
+    document.getElementById('afternoonBtn').closest('div').style.display = 'none';
+    const card = document.getElementById('checkinCard');
+    if (!document.getElementById('dayOffMsg')) {
+      const msg = document.createElement('div');
+      msg.id = 'dayOffMsg';
+      msg.style.cssText = 'margin-top:12px;font-size:1rem;font-weight:700;letter-spacing:0.5px';
+      msg.textContent = '🌴 Ngày nghỉ — Chúc bạn nghỉ ngơi vui vẻ!';
+      card.appendChild(msg);
+    }
+    card.style.background = 'linear-gradient(135deg,#10b981,#059669)';
+    if (ci) document.getElementById('statCheckin').textContent = '—';
+    return;
+  }
+
+  const hasMorning   = sched === 'morning'   || sched === 'fullday' || sched === 'full';
+  const hasAfternoon = sched === 'afternoon' || sched === 'fullday' || sched === 'full';
 
   // Ca Sáng
   const mBtn = document.getElementById('morningBtn');
