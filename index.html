@@ -811,7 +811,9 @@ async function saveNewEmployee() {
 
   // Gửi lên Google Sheets nếu đã cấu hình (nền, không block UI)
   if (DB_CONFIG.SCRIPT_URL && DB_CONFIG.SCRIPT_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL') {
-    apiCall('addEmployee', { emp, passHash }).catch(() => {});
+    apiCall('addEmployee', { emp, passHash }).then(r => {
+      if (!r.ok) showToast('⚠️ Lỗi lưu Sheet: ' + (r.error || 'không rõ'), 'danger');
+    }).catch(err => showToast('⚠️ Không kết nối được Apps Script: ' + err.message, 'danger'));
   }
 
   document.getElementById('addEmpModal').classList.add('hidden');
