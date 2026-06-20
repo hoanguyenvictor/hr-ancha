@@ -70,6 +70,36 @@
 </head>
 <body>
 
+<!-- LOGIN GATE -->
+<div id="loginGate" style="display:none;position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:white;border-radius:24px;padding:32px 28px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:2.5rem;margin-bottom:8px">👑</div>
+      <div style="font-size:1.3rem;font-weight:800;color:#1e293b">Ancha HR System</div>
+      <div style="font-size:0.82rem;color:#94a3b8;margin-top:4px">Đăng nhập để tiếp tục</div>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:0.82rem;font-weight:600;color:#475569;display:block;margin-bottom:6px">Tên đăng nhập</label>
+      <input type="text" id="gateCode" placeholder="Mã nhân viên hoặc tài khoản Boss"
+        style="width:100%;padding:12px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:0.9rem;box-sizing:border-box;outline:none"
+        onkeydown="if(event.key==='Enter')document.getElementById('gatePass').focus()">
+    </div>
+    <div style="margin-bottom:20px">
+      <label style="font-size:0.82rem;font-weight:600;color:#475569;display:block;margin-bottom:6px">Mật khẩu</label>
+      <input type="password" id="gatePass" placeholder="••••••••"
+        style="width:100%;padding:12px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:0.9rem;box-sizing:border-box;outline:none"
+        onkeydown="if(event.key==='Enter')doGateLogin()">
+    </div>
+    <div id="gateError" style="color:#ef4444;font-size:0.82rem;text-align:center;margin-bottom:12px;min-height:18px"></div>
+    <button onclick="doGateLogin()"
+      style="width:100%;padding:14px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:12px;font-size:0.95rem;font-weight:700;cursor:pointer">
+      Đăng Nhập
+    </button>
+  </div>
+</div>
+
 <!-- HEADER -->
 <div class="app-header">
   <div class="header-row">
@@ -80,6 +110,7 @@
     <div style="display:flex;gap:8px;align-items:center">
       <div id="alertBadge" class="hidden" style="background:#ef4444;color:white;border-radius:20px;padding:3px 10px;font-size:0.75rem;font-weight:700"></div>
       <button onclick="refreshAll()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:8px;padding:6px 10px;font-size:0.75rem;cursor:pointer">🔄</button>
+      <button onclick="bossLogout()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:8px;padding:6px 10px;font-size:0.75rem;cursor:pointer">Thoát</button>
     </div>
   </div>
 </div>
@@ -390,14 +421,76 @@ let overtimeRequests = [];
 let salaryData = {};
 
 // ─── INIT ──────────────────────────────────────────────
+// ─── LOGIN GATE ────────────────────────────────────────
+const BOSS_CODE = 'HOANGUYEN-ANCHA';
+const BOSS_PASS_HASH = '7c4f2b8e9d1a3f6c5e0b2d4a8f1c9e7b3d5a2f0c4e8b6d9a1f3c7e5b0d2a4f8'; // placeholder, sẽ set sau
+
+function bossLogout() {
+  sessionStorage.removeItem('bossAuth');
+  location.reload();
+}
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function doGateLogin() {
+  const code = document.getElementById('gateCode').value.trim().toUpperCase();
+  const pass = document.getElementById('gatePass').value;
+  document.getElementById('gateError').textContent = '';
+  if (!code || !pass) { document.getElementById('gateError').textContent = 'Vui lòng nhập đầy đủ!'; return; }
+
+  const hash = await sha256(pass);
+  const storedHash = localStorage.getItem('bossPassHash');
+
+  // Boss login
+  if (code === BOSS_CODE) {
+    if (storedHash && hash === storedHash) {
+      sessionStorage.setItem('bossAuth', '1');
+      document.getElementById('loginGate').style.display = 'none';
+      await initDashboard();
+      return;
+    }
+    // Lần đầu đăng nhập: lưu hash mật khẩu
+    if (!storedHash) {
+      localStorage.setItem('bossPassHash', hash);
+      sessionStorage.setItem('bossAuth', '1');
+      document.getElementById('loginGate').style.display = 'none';
+      await initDashboard();
+      return;
+    }
+    document.getElementById('gateError').textContent = '❌ Sai mật khẩu!';
+    return;
+  }
+
+  // Employee login → chuyển sang trang nhân viên
+  const res = await apiCall('login', { code, pass });
+  if (res.ok && res.user) {
+    localStorage.setItem('hrUser', JSON.stringify(res.user));
+    window.location.href = 'employee.html';
+  } else {
+    document.getElementById('gateError').textContent = '❌ Sai tên đăng nhập hoặc mật khẩu!';
+  }
+}
+
 async function init() {
+  // Kiểm tra xem đã đăng nhập chưa
+  if (!sessionStorage.getItem('bossAuth')) {
+    document.getElementById('loginGate').style.display = 'flex';
+    return;
+  }
+  await initDashboard();
+}
+
+async function initDashboard() {
+  document.getElementById('loginGate').style.display = 'none';
   document.getElementById('headerDate').textContent =
     new Date().toLocaleDateString('vi-VN', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
   document.getElementById('salaryMonth').textContent = monthKey();
-
   loadSettings();
   await refreshAll();
-  setInterval(refreshAll, 120000); // Auto refresh 2 phút
+  setInterval(refreshAll, 120000);
 }
 
 async function refreshAll() {
