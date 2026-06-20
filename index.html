@@ -509,7 +509,7 @@ async function loadEmployees() {
   if (DB_CONFIG.SCRIPT_URL && DB_CONFIG.SCRIPT_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL') {
     try {
       const res = await apiCall('getEmployees');
-      if (res.ok && res.data !== undefined) {
+      if (res.ok && res.data && res.data.length > 0) {
         employees = res.data;
         localStorage.setItem('employees', JSON.stringify(res.data));
       }
