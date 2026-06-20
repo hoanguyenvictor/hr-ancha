@@ -282,6 +282,15 @@
 </div>
 
 <!-- ── CÀI ĐẶT ────────────────────────────────────── -->
+<div class="page" id="page-photos">
+  <div class="card">
+    <div class="card-title"><span class="icon">📷</span>Hình Ảnh Theo Ngày</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Lưu 7 ngày gần nhất. Ảnh cũ hơn tự động xoá.</p>
+    <div id="photoDateFilter" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
+    <div id="photoGallery"></div>
+  </div>
+</div>
+
 <div class="page" id="page-settings">
   <div class="card">
     <div class="card-title"><span class="icon">⚙️</span>Cấu Hình Hệ Thống</div>
@@ -355,6 +364,9 @@
   </button>
   <button class="nav-item" onclick="switchPage('schedule',this)">
     <span class="icon">📅</span><span>Lịch</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('photos',this)">
+    <span class="icon">📷</span><span>Hình Ảnh</span>
   </button>
   <button class="nav-item" onclick="switchPage('settings',this)">
     <span class="icon">⚙️</span><span>Cài Đặt</span>
@@ -1195,11 +1207,67 @@ function switchPage(name, btn) {
   document.getElementById(`page-${name}`).classList.add('active');
   if (btn) btn.classList.add('active');
   else {
-    const idx = { overview:0, employees:1, overtime:2, salary:3, schedule:4, settings:5 };
+    const idx = { overview:0, employees:1, overtime:2, salary:3, schedule:4, photos:5, settings:6 };
     document.querySelectorAll('.nav-item')[idx[name]??0].classList.add('active');
   }
   if (name === 'salary') renderSalaryTab();
   if (name === 'schedule') renderScheduleTab();
+  if (name === 'photos') renderPhotosTab();
+}
+
+let allPhotos = [];
+async function renderPhotosTab() {
+  document.getElementById('photoGallery').innerHTML = '<p style="color:var(--muted);font-size:0.85rem">Đang tải...</p>';
+  const res = await apiCall('getPhotos', { date: today(), days: 6 });
+  if (!res.ok || !res.data.length) {
+    document.getElementById('photoDateFilter').innerHTML = '';
+    document.getElementById('photoGallery').innerHTML = '<p style="color:var(--muted);font-size:0.85rem">Chưa có ảnh trong 7 ngày qua</p>';
+    return;
+  }
+  allPhotos = res.data;
+  // Lấy danh sách ngày có ảnh
+  const dates = [...new Set(allPhotos.map(p => p.date))].sort().reverse();
+  document.getElementById('photoDateFilter').innerHTML = dates.map((d,i) =>
+    `<button onclick="filterPhotosByDate('${d}')" id="photoDayBtn_${d}"
+      style="padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:${i===0?'var(--primary)':'white'};color:${i===0?'white':'var(--text)'};font-size:0.8rem;cursor:pointer">
+      ${formatDateVN(d)}
+    </button>`
+  ).join('');
+  filterPhotosByDate(dates[0]);
+}
+
+function filterPhotosByDate(date) {
+  document.querySelectorAll('[id^="photoDayBtn_"]').forEach(b => {
+    b.style.background = b.id === `photoDayBtn_${date}` ? 'var(--primary)' : 'white';
+    b.style.color = b.id === `photoDayBtn_${date}` ? 'white' : 'var(--text)';
+  });
+  const photos = allPhotos.filter(p => p.date === date);
+  const TYPE_LABEL = { return_customer: '🔄 Hoàn khách', return_carrier: '📦 Hoàn VC' };
+  // Nhóm theo type
+  const grouped = {};
+  photos.forEach(p => {
+    const t = TYPE_LABEL[p.type] || p.type;
+    if (!grouped[t]) grouped[t] = [];
+    grouped[t].push(p);
+  });
+  let html = '';
+  Object.entries(grouped).forEach(([type, items]) => {
+    html += `<div style="font-size:0.82rem;font-weight:700;color:var(--muted);margin:12px 0 8px;text-transform:uppercase">${type}</div>`;
+    html += `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px">`;
+    items.forEach(p => {
+      const emp = employees.find(e => e.id === p.empId);
+      const empName = emp ? emp.name.split(' ').slice(-1)[0] : p.empId;
+      html += `<div style="border-radius:10px;overflow:hidden;border:1px solid var(--border);cursor:pointer" onclick="window.open('${p.url}','_blank')">
+        <img src="${p.url}" style="width:100%;aspect-ratio:1;object-fit:cover" onerror="this.style.display='none'">
+        <div style="padding:6px 8px;font-size:0.72rem;color:var(--muted)">
+          <div style="font-weight:600;color:var(--text)">${p.label}</div>
+          <div>${empName} · ${p.time}</div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+  document.getElementById('photoGallery').innerHTML = html;
 }
 
 function showToast(msg, type='success') {

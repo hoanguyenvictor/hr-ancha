@@ -27,6 +27,7 @@ const SHEETS = {
   PINGS:     'Pings',
   LOGS:      'Logs',
   SCHEDULE:  'Schedule',
+  PHOTOS:    'Photos',
 };
 
 // ─── ENTRY POINT (GET — tránh CORS) ──────────────────────────────
@@ -53,6 +54,9 @@ function doGet(e) {
       case 'getTodayReports':     result = getTodayReports(data); break;
       case 'submitSupply':        result = submitSupply(data); break;
       case 'submitReturn':        result = submitReturn(data); break;
+      case 'uploadPhoto':         result = uploadPhoto(data); break;
+      case 'getPhotos':           result = getPhotos(data); break;
+      case 'cleanOldPhotos':      result = cleanOldPhotos(); break;
       case 'startShift':          result = startShift(data); break;
       case 'endShift':            result = endShift(data); break;
       case 'registerOvertime':    result = registerOvertime(data); break;
@@ -119,6 +123,7 @@ function initSheet(sheet, name) {
     [SHEETS.SCHEDULE]:   ['empId','weekStart','day','date','shift','eveningStart','eveningEnd','plannedHours','actualHours','status'],
     [SHEETS.OVERTIME]:   ['id','empId','date','start','end','hours','plan','status','approvedBy','approvedAt','resultDesc'],
     [SHEETS.RETURNS]:    ['empId','date','time','orderId','product','qty','condition','photo'],
+    [SHEETS.PHOTOS]:     ['empId','date','time','type','label','url','driveId','expires'],
     [SHEETS.DEDUCTIONS]: ['empId','month','date','reason','amount'],
     [SHEETS.SALARY]:     ['empId','month','salesBonus','confirmed','confirmedAt'],
     [SHEETS.PINGS]:      ['empId','date','time','responded'],
@@ -778,4 +783,77 @@ function approveShiftHours(data) {
   }
   log('APPROVE_HOURS', `Boss xác nhận ${empId} ${day} ${weekStart}: ${actualHours}h`);
   return { ok: true };
+}
+
+// ─── PHOTO STORAGE (Google Drive) ────────────────────────────────
+function getOrCreateFolder() {
+  const folderName = 'HR-Ancha-Photos';
+  const folders = DriveApp.getFoldersByName(folderName);
+  return folders.hasNext() ? folders.next() : DriveApp.createFolder(folderName);
+}
+
+function uploadPhoto(data) {
+  const { empId, date, type, label, base64, mimeType } = data;
+  if (!base64) return { ok: false, error: 'Không có dữ liệu ảnh' };
+  try {
+    const folder = getOrCreateFolder();
+    const blob = Utilities.newBlob(Utilities.base64Decode(base64), mimeType || 'image/jpeg', `${empId}_${type}_${Date.now()}.jpg`);
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    const url = `https://drive.google.com/uc?export=view&id=${file.getId()}`;
+    // Lưu metadata vào Sheet Photos
+    const expires = new Date();
+    expires.setDate(expires.getDate() + 7);
+    appendRow(SHEETS.PHOTOS, {
+      empId, date, time: new Date().toTimeString().slice(0,5),
+      type, label: label || type,
+      url, driveId: file.getId(),
+      expires: expires.toISOString().slice(0,10)
+    });
+    return { ok: true, url };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+function getPhotos(data) {
+  const { date, days } = data;
+  const rows = sheetData(SHEETS.PHOTOS);
+  if (!date) return { ok: true, data: rows };
+  // Lấy ảnh trong khoảng `days` ngày gần nhất
+  const from = new Date(date);
+  from.setDate(from.getDate() - (days || 6));
+  const fromStr = from.toISOString().slice(0,10);
+  return { ok: true, data: rows.filter(r => r.date >= fromStr && r.date <= date) };
+}
+
+function cleanOldPhotos() {
+  const today = new Date().toISOString().slice(0,10);
+  const sheet = getSheet(SHEETS.PHOTOS);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const expiresIdx = headers.indexOf('expires');
+  const driveIdIdx = headers.indexOf('driveId');
+  let deleted = 0;
+  for (let i = vals.length - 1; i >= 1; i--) {
+    const expires = String(vals[i][expiresIdx]);
+    if (expires && expires < today) {
+      try { DriveApp.getFileById(vals[i][driveIdIdx]).setTrashed(true); } catch(e) {}
+      sheet.deleteRow(i + 1);
+      deleted++;
+    }
+  }
+  return { ok: true, deleted };
+}
+
+// Trigger tự động chạy hàng ngày — tạo 1 lần trong Apps Script
+function setupDailyCleanup() {
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'dailyCleanup') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('dailyCleanup').timeBased().everyDays(1).atHour(2).create();
+}
+
+function dailyCleanup() {
+  cleanOldPhotos();
 }

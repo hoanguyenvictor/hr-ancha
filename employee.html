@@ -891,12 +891,23 @@ async function submitReturnCustomer() {
   const f1 = document.getElementById('r1_photoShipper').files[0];
   const f2 = document.getElementById('r1_photoActual').files[0];
   const f3 = document.getElementById('r1_qrPhoto').files[0];
-  const photoShipper = f1 ? await toBase64(f1) : null;
-  const photoActual = f2 ? await toBase64(f2) : null;
-  const photoQR = f3 ? await toBase64(f3) : null;
+  showToast('⏳ Đang tải ảnh lên...', 'info');
+
+  async function uploadIfExists(file, label) {
+    if (!file) return null;
+    const b64 = (await toBase64(file)).split(',')[1];
+    const res = await apiCall('uploadPhoto', { empId: state.user.id, date: today(), type: 'return_customer', label, base64: b64, mimeType: file.type });
+    return res.ok ? res.url : null;
+  }
+
+  const [urlShipper, urlActual, urlQR] = await Promise.all([
+    uploadIfExists(f1, `Ảnh shipper - ĐH ${orderId}`),
+    uploadIfExists(f2, `Ảnh thực tế - ĐH ${orderId}`),
+    uploadIfExists(f3, `Mã QR khách - ĐH ${orderId}`),
+  ]);
 
   await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'customer',
-    orderId, amount, bankInfo, condition, photoShipper, photoActual, photoQR });
+    orderId, amount, bankInfo, condition, photoShipper: urlShipper, photoActual: urlActual, photoQR: urlQR });
   showToast('✅ Đã ghi nhận! Boss sẽ xem xét và hoàn tiền cho khách.', 'success');
   document.getElementById('r1_orderId').value = '';
   document.getElementById('r1_amount').value = '';
@@ -912,11 +923,22 @@ async function submitReturnCarrier() {
 
   const f1 = document.getElementById('r2_photoOrders').files[0];
   const f2 = document.getElementById('r2_photoPancake').files[0];
-  const photoOrders = f1 ? await toBase64(f1) : null;
-  const photoPancake = f2 ? await toBase64(f2) : null;
+  showToast('⏳ Đang tải ảnh lên...', 'info');
+
+  async function uploadCarrierPhoto(file, label) {
+    if (!file) return null;
+    const b64 = (await toBase64(file)).split(',')[1];
+    const res = await apiCall('uploadPhoto', { empId: state.user.id, date: today(), type: 'return_carrier', label, base64: b64, mimeType: file.type });
+    return res.ok ? res.url : null;
+  }
+
+  const [urlOrders, urlPancake] = await Promise.all([
+    uploadCarrierPhoto(f1, `Ảnh đơn hoàn VC ${today()}`),
+    uploadCarrierPhoto(f2, `Ảnh Pancake ${today()}`),
+  ]);
 
   await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'carrier',
-    count, orderIds, photoOrders, photoPancake });
+    count, orderIds, photoOrders: urlOrders, photoPancake: urlPancake });
   showToast('✅ Đã ghi nhận hàng vận chuyển hoàn về!', 'success');
   document.getElementById('r2_count').value = '';
   document.getElementById('r2_orderIds').value = '';
