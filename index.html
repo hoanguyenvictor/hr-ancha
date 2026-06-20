@@ -304,14 +304,7 @@
   </div>
 </div>
 
-<div class="page" id="page-photos">
-  <div class="card">
-    <div class="card-title"><span class="icon">📷</span>Hình Ảnh Theo Ngày</div>
-    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Lưu 7 ngày gần nhất. Ảnh cũ hơn tự động xoá.</p>
-    <div id="photoDateFilter" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
-    <div id="photoGallery"></div>
-  </div>
-</div>
+<div id="page-photos" style="display:none"></div>
 
 <div class="page" id="page-settings">
   <div class="card">
@@ -392,9 +385,6 @@
   </button>
   <button class="nav-item" onclick="switchPage('notifications',this)" id="navNotif">
     <span class="icon">🔔</span><span>Thông Báo</span>
-  </button>
-  <button class="nav-item" onclick="switchPage('photos',this)">
-    <span class="icon">📷</span><span>Hình Ảnh</span>
   </button>
   <button class="nav-item" onclick="switchPage('settings',this)">
     <span class="icon">⚙️</span><span>Cài Đặt</span>
