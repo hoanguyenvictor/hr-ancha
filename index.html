@@ -688,9 +688,13 @@ function buildEmpAlerts(emp, r) {
 
 function renderSupplyOverview() {
   const SUPPLY_LABELS = {
-    carton_30x20x10: 'Hộp 30×20×10', carton_25x20x10: 'Hộp 25×20×10',
-    carton_15x10x10: 'Hộp 15×10×10', tape: 'Băng dính',
-    bubble_wrap: 'Xốp chống sốc', print_paper: 'Giấy in'
+    carton_nap_gap_35x25x7: 'Hộp nắp gập 35×25×7', carton_nap_gap_20x15x6: 'Hộp nắp gập 20×15×6',
+    carton_doi_khau_40x30x20: 'Hộp đối khẩu 40×30×20', carton_doi_khau_35x25x15: 'Hộp đối khẩu 35×25×15',
+    carton_doi_khau_12x12x12: 'Hộp đối khẩu 12×12×12', hop_dong_ho: 'Hộp đựng đồng hồ',
+    hop_vong_tay: 'Hộp đựng vòng tay', bang_dinh: 'Băng dính',
+    xop_60cm: 'Xốp chống sốc 60cm', xop_40cm: 'Xốp chống sốc 40cm',
+    giay_in_don: 'Giấy in đơn', decan_noi: 'Decan Nói',
+    decan_vanh: 'Decan Vành', decan_vua: 'Decan Vừa', giay_nen_vua: 'Giấy nến bọc hàng'
   };
   const SUPPLY_ALERT = DB_CONFIG.SUPPLY_ALERT;
 

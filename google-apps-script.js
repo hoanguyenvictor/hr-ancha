@@ -151,9 +151,14 @@ function sheetData(name) {
   const vals = sheet.getDataRange().getValues();
   if (vals.length < 2) return [];
   const headers = vals[0];
+  const tz = Session.getScriptTimeZone();
   return vals.slice(1).map(row => {
     const obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
+    headers.forEach((h, i) => {
+      let v = row[i];
+      if (v instanceof Date) v = Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+      obj[h] = v;
+    });
     return obj;
   });
 }
@@ -381,12 +386,21 @@ function submitSupply(data) {
   const { empId, date, data: supplyData, hasAlert, reportedBy, onBehalfOf } = data;
   appendRow(SHEETS.SUPPLY, {
     empId, date, time: new Date().toTimeString().slice(0,5),
-    carton_30x20x10: supplyData.carton_30x20x10 ?? '',
-    carton_25x20x10: supplyData.carton_25x20x10 ?? '',
-    carton_15x10x10: supplyData.carton_15x10x10 ?? '',
-    tape: supplyData.tape ?? '',
-    bubble_wrap: supplyData.bubble_wrap ?? '',
-    print_paper: supplyData.print_paper ?? '',
+    carton_nap_gap_35x25x7: supplyData.carton_nap_gap_35x25x7 ?? '',
+    carton_nap_gap_20x15x6: supplyData.carton_nap_gap_20x15x6 ?? '',
+    carton_doi_khau_40x30x20: supplyData.carton_doi_khau_40x30x20 ?? '',
+    carton_doi_khau_35x25x15: supplyData.carton_doi_khau_35x25x15 ?? '',
+    carton_doi_khau_12x12x12: supplyData.carton_doi_khau_12x12x12 ?? '',
+    hop_dong_ho: supplyData.hop_dong_ho ?? '',
+    hop_vong_tay: supplyData.hop_vong_tay ?? '',
+    bang_dinh: supplyData.bang_dinh ?? '',
+    xop_60cm: supplyData.xop_60cm ?? '',
+    xop_40cm: supplyData.xop_40cm ?? '',
+    giay_in_don: supplyData.giay_in_don ?? '',
+    decan_noi: supplyData.decan_noi ?? '',
+    decan_vanh: supplyData.decan_vanh ?? '',
+    decan_vua: supplyData.decan_vua ?? '',
+    giay_nen_vua: supplyData.giay_nen_vua ?? '',
     hasAlert: hasAlert ? 'TRUE' : 'FALSE',
     reportedBy: reportedBy || empId,
     onBehalfOf: onBehalfOf || '',
@@ -401,11 +415,9 @@ function submitSupply(data) {
   // Gửi Telegram
   const onBehalfNote = reporterName ? `\n👥 Đại diện bởi: <b>${reporterName}</b>` : '';
   if (hasAlert) {
+    const alertCfg = { carton_nap_gap_35x25x7:20, carton_nap_gap_20x15x6:20, carton_doi_khau_40x30x20:20, carton_doi_khau_35x25x15:20, carton_doi_khau_12x12x12:20, hop_dong_ho:20, hop_vong_tay:20, bang_dinh:2, xop_60cm:1, xop_40cm:1, giay_in_don:2, decan_noi:5, decan_vanh:5, decan_vua:5, giay_nen_vua:20 };
     const alertItems = Object.entries(supplyData)
-      .filter(([k,v]) => {
-        const cfg = { carton_30x20x10:20, carton_25x20x10:20, carton_15x10x10:20, tape:2, bubble_wrap:2, print_paper:2 };
-        return v !== null && v !== '' && cfg[k] && Number(v) < cfg[k];
-      })
+      .filter(([k,v]) => v !== null && v !== '' && alertCfg[k] && Number(v) < alertCfg[k])
       .map(([k,v]) => `  • ${k}: còn <b>${v}</b>`).join('\n');
     sendTelegram(`⚠️ <b>CẢNH BÁO KHO THẤP</b>\n👤 ${empName}${onBehalfNote}\n📅 ${date}\n\nMặt hàng cần bổ sung:\n${alertItems}`);
     log('SUPPLY_ALERT', `${empId} báo kho thấp - ${date}${onBehalfOf ? ' (đại diện bởi ' + reportedBy + ')' : ''}`);

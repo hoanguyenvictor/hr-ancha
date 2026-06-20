@@ -24,12 +24,21 @@ const DB_CONFIG = {
   PING_INTERVAL_MIN: 20,       // Random ping mỗi 20-40 phút
   PING_INTERVAL_MAX: 40,
   SUPPLY_ALERT: {              // Ngưỡng cảnh báo dụng cụ
-    carton_30x20x10: 20,
-    carton_25x20x10: 20,
-    carton_15x10x10: 20,
-    tape: 2,
-    bubble_wrap: 2,
-    print_paper: 2,
+    carton_nap_gap_35x25x7: 20,
+    carton_nap_gap_20x15x6: 20,
+    carton_doi_khau_40x30x20: 20,
+    carton_doi_khau_35x25x15: 20,
+    carton_doi_khau_12x12x12: 20,
+    hop_dong_ho: 20,
+    hop_vong_tay: 20,
+    bang_dinh: 2,
+    xop_60cm: 1,
+    xop_40cm: 1,
+    giay_in_don: 2,
+    decan_noi: 5,
+    decan_vanh: 5,
+    decan_vua: 5,
+    giay_nen_vua: 20,
   }
 };
 
