@@ -352,6 +352,42 @@
   </div>
 </div>
 
+<!-- ── CÀI ĐẶT ───────────────────────────────────── -->
+<div class="page" id="page-settings">
+  <div class="card">
+    <div class="card-title"><span class="icon">👤</span>Thông Tin Tài Khoản</div>
+    <div id="settingsUserInfo" style="font-size:0.88rem;color:var(--muted);margin-bottom:4px"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">🔑</span>Đổi Mật Khẩu</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">Sau khi đổi sẽ tự đăng xuất, dùng mật khẩu mới để đăng nhập lại.</p>
+    <div class="form-group">
+      <label>Mật khẩu hiện tại</label>
+      <input type="password" id="pwCurrent" placeholder="••••••" autocomplete="current-password"
+        style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:0.88rem;box-sizing:border-box">
+    </div>
+    <div class="form-group">
+      <label>Mật khẩu mới</label>
+      <input type="password" id="pwNew" placeholder="Tối thiểu 6 ký tự" autocomplete="new-password"
+        style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:0.88rem;box-sizing:border-box">
+    </div>
+    <div class="form-group">
+      <label>Xác nhận mật khẩu mới</label>
+      <input type="password" id="pwConfirm" placeholder="Nhập lại mật khẩu mới" autocomplete="new-password"
+        style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:0.88rem;box-sizing:border-box">
+    </div>
+    <div id="pwError" style="color:var(--danger);font-size:0.82rem;margin-bottom:10px;min-height:18px"></div>
+    <button class="btn btn-primary" onclick="changePassword()" style="width:100%">🔑 Đổi Mật Khẩu</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">🚪</span>Đăng Xuất</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Thoát khỏi tài khoản trên thiết bị này.</p>
+    <button class="btn btn-danger" onclick="logoutEmployee()" style="width:100%">🚪 Đăng Xuất</button>
+  </div>
+</div>
+
 <!-- ── BOTTOM NAV ─────────────────────────────────── -->
 <nav class="bottom-nav">
   <button class="nav-item active" onclick="switchPage('home',this)">
@@ -368,6 +404,9 @@
   </button>
   <button class="nav-item" onclick="switchPage('salary',this)">
     <span class="icon">💰</span><span>Lương</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('settings',this)">
+    <span class="icon">⚙️</span><span>Cài Đặt</span>
   </button>
 </nav>
 
@@ -1241,11 +1280,56 @@ function switchPage(name, btn) {
   document.getElementById(`page-${name}`).classList.add('active');
   if (btn) btn.classList.add('active');
   else {
-    const navBtns = { home: 0, checklist: 1, inventory: 2, overtime: 3, salary: 4 };
+    const navBtns = { home: 0, checklist: 1, inventory: 2, overtime: 3, salary: 4, settings: 5 };
     document.querySelectorAll('.nav-item')[navBtns[name] ?? 0].classList.add('active');
   }
   if (name === 'overtime') renderSchedule();
   if (name === 'salary') renderSalary();
+  if (name === 'settings') renderSettingsPage();
+}
+
+function renderSettingsPage() {
+  const u = state.user;
+  if (!u) return;
+  document.getElementById('settingsUserInfo').innerHTML =
+    `<div style="display:flex;align-items:center;gap:12px;padding:4px 0">
+      <div style="width:44px;height:44px;border-radius:50%;background:${u.color||'#667eea'};
+        display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:1.1rem">
+        ${(u.name||'?').split(' ').pop()[0]}
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:0.95rem;color:var(--text)">${u.name}</div>
+        <div style="font-size:0.8rem;color:var(--muted);margin-top:2px">Mã: ${u.id}</div>
+      </div>
+    </div>`;
+}
+
+async function changePassword() {
+  const current = document.getElementById('pwCurrent').value;
+  const newPw   = document.getElementById('pwNew').value;
+  const confirm = document.getElementById('pwConfirm').value;
+  const errEl   = document.getElementById('pwError');
+  errEl.textContent = '';
+
+  if (!current || !newPw || !confirm) { errEl.textContent = 'Vui lòng điền đầy đủ!'; return; }
+  if (newPw.length < 6) { errEl.textContent = 'Mật khẩu mới tối thiểu 6 ký tự!'; return; }
+  if (newPw !== confirm) { errEl.textContent = 'Mật khẩu xác nhận không khớp!'; return; }
+
+  // Xác minh mật khẩu hiện tại qua API
+  const currentHash = await sha256(current);
+  const verifyRes = await apiCall('login', { code: state.user.id, passHash: currentHash });
+  if (!verifyRes.ok) { errEl.textContent = '❌ Mật khẩu hiện tại không đúng!'; return; }
+
+  // Gửi mật khẩu mới lên Sheet
+  const newHash = await sha256(newPw);
+  const res = await apiCall('changePassword', { empId: state.user.id, passHash: newHash });
+  if (!res.ok) { errEl.textContent = '❌ Lỗi khi đổi mật khẩu, thử lại!'; return; }
+
+  showToast('✅ Đổi mật khẩu thành công! Đang đăng xuất...', 'success');
+  setTimeout(() => {
+    localStorage.removeItem('hrUser');
+    location.reload();
+  }, 1800);
 }
 
 function showToast(msg, type = 'success') {

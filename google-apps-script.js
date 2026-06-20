@@ -78,6 +78,7 @@ function doGet(e) {
       case 'editSchedule':        result = editSchedule(data); break;
       case 'savePenalties':       result = savePenalties(data); break;
       case 'getPenalties':        result = getPenalties(data); break;
+      case 'changePassword':      result = changePassword(data); break;
       default: result = { ok: false, error: 'Unknown action: ' + action };
     }
 
@@ -685,6 +686,23 @@ function editSchedule(data) {
   }
   log('EDIT_SCHEDULE', `Boss sửa lịch ${empId} ${dayKey} ${weekStart}: ${shift}`);
   return { ok: true };
+}
+
+function changePassword(data) {
+  const { empId, passHash } = data;
+  const sheet = getSheet(SHEETS.EMPLOYEES);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const idCol = headers.indexOf('id');
+  const hashCol = headers.indexOf('passHash');
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][idCol]) === String(empId)) {
+      sheet.getRange(i + 1, hashCol + 1).setValue(passHash);
+      log('CHANGE_PASSWORD', `${empId} đổi mật khẩu`);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Không tìm thấy nhân viên' };
 }
 
 function getPenalties(data) {
