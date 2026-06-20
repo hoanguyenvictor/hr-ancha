@@ -436,8 +436,11 @@
   <button class="nav-item" onclick="switchPage('inventory',this)">
     <span class="icon">📦</span><span>Kho</span>
   </button>
+  <button class="nav-item" onclick="switchPage('overtime',this)">
+    <span class="icon">📅</span><span>Lịch</span>
+  </button>
   <button class="nav-item" onclick="switchPage('diary',this)">
-    <span class="icon">📅</span><span>Nhật Ký</span>
+    <span class="icon">📒</span><span>Nhật Ký</span>
   </button>
   <button class="nav-item" onclick="switchPage('salary',this)">
     <span class="icon">💰</span><span>Lương</span>
@@ -1403,7 +1406,7 @@ function switchPage(name, btn) {
   document.getElementById(`page-${name}`).classList.add('active');
   if (btn) btn.classList.add('active');
   else {
-    const navBtns = { home: 0, checklist: 1, inventory: 2, diary: 3, salary: 4, settings: 5 };
+    const navBtns = { home: 0, checklist: 1, inventory: 2, overtime: 3, diary: 4, salary: 5, settings: 6 };
     document.querySelectorAll('.nav-item')[navBtns[name] ?? 0].classList.add('active');
   }
   if (name === 'salary') renderSalary();
