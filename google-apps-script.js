@@ -315,29 +315,13 @@ function handleCheckout(data) {
 }
 
 function addAutoPenalty(empId, date, reason, note) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = ss.getSheetByName('Penalties');
-  if (!sheet) {
-    sheet = ss.insertSheet('Penalties');
-    sheet.appendRow(['month','empId','empName','reason','date','amount','note','auto']);
-  }
-  const month = date.slice(0, 7); // YYYY-MM
-  // Không thêm trùng (cùng empId + date + reason)
-  const vals = sheet.getDataRange().getValues();
-  for (let i = 1; i < vals.length; i++) {
-    if (String(vals[i][1]) === String(empId) && String(vals[i][4]) === String(date) && String(vals[i][3]) === String(reason)) return;
-  }
-  // Lấy tên nhân viên
-  const empSheet = getSheet(SHEETS.EMPLOYEES);
-  const empVals = empSheet.getDataRange().getValues();
-  const empHeaders = empVals[0];
-  const nameCol = empHeaders.indexOf('name');
-  const idCol = empHeaders.indexOf('id');
-  let empName = empId;
-  for (let i = 1; i < empVals.length; i++) {
-    if (String(empVals[i][idCol]) === String(empId)) { empName = empVals[i][nameCol]; break; }
-  }
-  sheet.appendRow([month, empId, empName, reason, date, 50000, note, 'auto']);
+  const month = date.slice(0, 7);
+  // Kiểm tra trùng trước khi ghi
+  const existing = sheetData(SHEETS.DEDUCTIONS).filter(r =>
+    String(r.empId) === String(empId) && String(r.date) === String(date) && String(r.reason) === String(reason)
+  );
+  if (existing.length > 0) return;
+  appendRow(SHEETS.DEDUCTIONS, { empId, month, date, reason, amount: 50000, note: note || '' });
 }
 
 // ─── CHECKLIST ────────────────────────────────────────────────────
@@ -677,14 +661,24 @@ function getSalaryData(data) {
     }, 0);
     const otHours = otHoursOld + otHoursNew;
 
-    // Thưởng chuyên cần: trừ nếu có đi muộn
-    const lateDays = checkins.filter(c => c.empId === emp.id && c.late === 'TRUE').length;
-    const absentDays = 0; // TODO: tính ngày vắng
-    const attendanceBonus = lateDays > 0 ? Math.max(0, 300000 - lateDays * 30000) : 300000;
+    // Thưởng chuyên cần: trừ 50.000 mỗi vi phạm (trễ, về sớm, thiếu check-in/out)
+    const attendanceDeductions = empDeductions.filter(d =>
+      d.reason && (
+        d.reason.includes('late') ||
+        d.reason.includes('early') ||
+        d.reason.includes('absent') ||
+        d.reason.includes('Đi muộn') ||
+        d.reason.includes('Về sớm') ||
+        d.reason.includes('Không check')
+      )
+    );
+    const attendanceBonus = Math.max(0, 300000 - attendanceDeductions.reduce((s,d)=>s+Number(d.amount||50000),0));
 
-    // Thưởng nhiệm vụ: trừ theo deductions liên quan checklist
-    const taskDeductions = empDeductions.filter(d => d.reason.includes('checklist')||d.reason.includes('nhiệm vụ'));
-    const taskBonus = Math.max(0, 500000 - taskDeductions.reduce((s,d)=>s+Number(d.amount),0));
+    // Thưởng nhiệm vụ: trừ 50.000 mỗi lần checklist không đạt
+    const taskDeductions = empDeductions.filter(d =>
+      d.reason && (d.reason.includes('Checklist') || d.reason.includes('checklist') || d.reason.includes('nhiệm vụ'))
+    );
+    const taskBonus = Math.max(0, 500000 - taskDeductions.reduce((s,d)=>s+Number(d.amount||50000),0));
 
     result[emp.id] = {
       baseSalary: Number(emp.salary) || 0,
