@@ -1187,7 +1187,13 @@ document.getElementById('addEmpModal').addEventListener('click', function(e) {
   if (e.target === this) this.classList.add('hidden');
 });
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+if ('serviceWorker' in navigator) {
+  // Xoá toàn bộ cache cũ trước khi đăng ký service worker mới
+  caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+  navigator.serviceWorker.getRegistrations().then(regs => {
+    regs.forEach(r => r.unregister());
+  }).then(() => navigator.serviceWorker.register('sw.js')).catch(()=>{});
+}
 init();
 </script>
 </body>
