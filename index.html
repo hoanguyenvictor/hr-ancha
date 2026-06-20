@@ -1286,14 +1286,18 @@ async function loadNotifications() {
 
   const returnsHTML = returns.map(r => {
     const isCustomer = r.type === 'customer';
-    const photos = [r.photoShipper, r.photoActual, r.photoQR, r.photoOrders, r.photoPancake].filter(Boolean);
-    const photoHTML = photos.map(url => `<a href="${url}" target="_blank"><img src="${url}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"></a>`).join('');
+    const photoMap = isCustomer
+      ? [['🔳 Mã QR khách', r.photoQR], ['📋 Ảnh shipper', r.photoShipper], ['📷 Ảnh thực tế', r.photoActual]]
+      : [['📦 Ảnh đơn hoàn', r.photoOrders], ['💻 Ảnh Pancake', r.photoPancake]];
+    const photoHTML = photoMap.filter(([,url]) => url).map(([label, url]) =>
+      `<a href="${url}" target="_blank" style="display:inline-flex;align-items:center;gap:5px;padding:6px 10px;background:var(--primary);color:white;border-radius:8px;font-size:0.8rem;font-weight:600;text-decoration:none;margin:3px">${label} 👁</a>`
+    ).join('');
     return `
     <div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
       <div style="font-size:0.72rem;color:var(--warning);font-weight:700;margin-bottom:4px">${isCustomer ? '🔄 HOÀN — KHÁCH TRẢ' : '🚚 HOÀN — VẬN CHUYỂN'}</div>
       <div style="font-weight:700">👤 ${r.empName} · 📅 ${r.date}</div>
       ${isCustomer ? `<div style="font-size:0.85rem;margin:6px 0">📦 Đơn: <b>${r.orderId}</b> · 💰 <b>${Number(r.amount||0).toLocaleString('vi-VN')}đ</b></div><div style="font-size:0.82rem;color:var(--muted)">🏦 ${r.bankInfo}</div>` : `<div style="font-size:0.85rem;margin:6px 0">📦 Số đơn: <b>${r.count}</b></div><div style="font-size:0.78rem;color:var(--muted);white-space:pre-wrap">${r.orderIds||''}</div>`}
-      ${photos.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">${photoHTML}</div>` : ''}
+      ${photoHTML ? `<div style="margin:8px 0;display:flex;flex-wrap:wrap">${photoHTML}</div>` : '<div style="font-size:0.78rem;color:var(--muted);margin:6px 0">📷 Chưa có ảnh (nhân viên cần update app)</div>'}
       ${isCustomer ? `
       <div style="margin-top:8px">
         <label style="font-size:0.8rem;color:var(--muted)">📷 Upload ảnh CK thành công cho khách:</label>

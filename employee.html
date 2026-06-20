@@ -1434,7 +1434,7 @@ async function loadEmpNotifications() {
         ${ok ? '✅ Boss đã xác nhận hoàn tiền' : '❌ Boss từ chối — liên hệ Boss để xử lý'}
       </div>
       ${isCustomer ? `<div style="font-size:0.82rem;color:var(--muted);margin-top:4px">📦 Đơn: ${r.orderId} · 💰 ${Number(r.amount||0).toLocaleString('vi-VN')}đ</div>` : `<div style="font-size:0.82rem;color:var(--muted);margin-top:4px">📦 ${r.count} đơn · 📅 ${r.date}</div>`}
-      ${ok && r.proofUrl ? `<div style="margin-top:8px"><a href="${r.proofUrl}" target="_blank" download style="display:inline-block;padding:6px 12px;background:var(--primary);color:white;border-radius:8px;font-size:0.82rem;text-decoration:none">📥 Tải ảnh CK gửi khách</a></div>` : ''}
+      ${r.proofUrl ? `<div style="margin-top:8px"><a href="${r.proofUrl}" target="_blank" style="display:inline-block;padding:8px 14px;background:var(--primary);color:white;border-radius:8px;font-size:0.85rem;font-weight:700;text-decoration:none">📥 Xem & Tải ảnh CK gửi khách</a></div>` : (ok ? '<div style="font-size:0.8rem;color:var(--muted);margin-top:6px">⏳ Boss chưa upload ảnh CK</div>' : '')}
     </div>`;
   }).join('');
 
