@@ -1326,15 +1326,49 @@ function toBase64(file) {
   });
 }
 
+function compressImage(file, maxWidth = 600, quality = 0.4) {
+  return new Promise(resolve => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width, h = img.height;
+        if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        canvas.toBlob(blob => resolve(blob), 'image/jpeg', quality);
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function uploadViaChunks(file, type, label, empId) {
+  try {
+    const compressed = await compressImage(file);
+    const b64 = (await toBase64(compressed)).split(',')[1].replace(/^data:image\/jpeg;base64,/, '');
+    const uuid = Math.random().toString(36).substr(2, 9) + Date.now();
+    const CHUNK = 3000;
+    const chunks = [];
+    for (let i = 0; i < b64.length; i += CHUNK) chunks.push(b64.substr(i, CHUNK));
+    for (let i = 0; i < chunks.length; i++) {
+      const res = await apiCall('uploadChunk', { uuid, chunk: chunks[i], index: i });
+      if (!res.ok) return '';
+    }
+    const res = await apiCall('finalizeUpload', { uuid, totalChunks: chunks.length, empId, date: today(), type, label });
+    return res.ok ? res.url : '';
+  } catch(e) { return ''; }
+}
+
 async function confirmReturn(id, empId, isCustomer) {
   let proofUrl = '';
   if (isCustomer) {
     const file = document.getElementById(`proof_${id}`)?.files[0];
     if (file) {
       showToast('⏳ Đang tải ảnh CK lên...', 'info');
-      const b64 = (await toBase64(file)).split(',')[1];
-      const res = await apiCall('uploadPhoto', { empId, date: today(), type: 'return_proof', label: `Ảnh CK hoàn - ${id}`, base64: b64, mimeType: file.type });
-      proofUrl = res.ok ? res.url : '';
+      proofUrl = await uploadViaChunks(file, 'return_proof', `Ảnh CK hoàn - ${id}`, empId);
     }
   }
   const res = await apiCall('confirmReturn', { id, empId, approved: true, proofUrl });

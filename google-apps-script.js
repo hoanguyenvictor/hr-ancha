@@ -85,6 +85,8 @@ function doGet(e) {
       case 'submitSupply':        result = submitSupply(data); break;
       case 'submitReturn':        result = submitReturn(data); break;
       case 'uploadPhoto':         result = uploadPhoto(data); break;
+      case 'uploadChunk':         result = uploadChunk(data); break;
+      case 'finalizeUpload':      result = finalizeUpload(data); break;
       case 'getPhotos':           result = getPhotos(data); break;
       case 'cleanOldPhotos':      result = cleanOldPhotos(); break;
       case 'startShift':          result = startShift(data); break;
@@ -928,14 +930,50 @@ function uploadPhoto(data) {
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     const url = `https://drive.google.com/uc?export=view&id=${file.getId()}`;
-    // Lưu metadata vào Sheet Photos
-    const expires = new Date();
-    expires.setDate(expires.getDate() + 7);
     appendRow(SHEETS.PHOTOS, {
       empId, date, time: new Date().toTimeString().slice(0,5),
       type, label: label || type,
       url, driveId: file.getId(),
-      expires: expires.toISOString().slice(0,10)
+      expires: new Date(Date.now() + 7*86400000).toISOString().slice(0,10)
+    });
+    return { ok: true, url };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+// ─── CHUNKED UPLOAD (ảnh lớn chia thành nhiều phần nhỏ) ─────────────
+function uploadChunk(data) {
+  const { uuid, chunk, index } = data;
+  if (!uuid || chunk === undefined || index === undefined) return { ok: false, error: 'Thiếu tham số' };
+  try {
+    CacheService.getScriptCache().put(`chunk_${uuid}_${index}`, chunk, 21600);
+    return { ok: true };
+  } catch(e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+function finalizeUpload(data) {
+  const { uuid, totalChunks, empId, date, type, label } = data;
+  try {
+    const cache = CacheService.getScriptCache();
+    let base64 = '';
+    for (let i = 0; i < totalChunks; i++) {
+      const chunk = cache.get(`chunk_${uuid}_${i}`);
+      if (!chunk) return { ok: false, error: `Mất chunk ${i}` };
+      base64 += chunk;
+    }
+    const folder = getOrCreateFolder();
+    const blob = Utilities.newBlob(Utilities.base64Decode(base64), 'image/jpeg', `${empId}_${type}_${Date.now()}.jpg`);
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    const url = `https://drive.google.com/uc?export=view&id=${file.getId()}`;
+    appendRow(SHEETS.PHOTOS, {
+      empId, date, time: new Date().toTimeString().slice(0,5),
+      type, label: label || type,
+      url, driveId: file.getId(),
+      expires: new Date(Date.now() + 7*86400000).toISOString().slice(0,10)
     });
     return { ok: true, url };
   } catch(e) {

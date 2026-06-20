@@ -932,10 +932,7 @@ async function submitReturnCustomer() {
 
   async function uploadIfExists(file, label) {
     if (!file) return null;
-    const compressed = await compressImage(file);
-    const b64 = (await toBase64(compressed)).split(',')[1];
-    const res = await apiCall('uploadPhoto', { empId: state.user.id, date: today(), type: 'return_customer', label, base64: b64, mimeType: 'image/jpeg' });
-    return res.ok ? res.url : null;
+    return uploadViaChunks(file, 'return_customer', label);
   }
 
   const [urlShipper, urlActual, urlQR] = await Promise.all([
@@ -969,10 +966,7 @@ async function submitReturnCarrier() {
 
   async function uploadCarrierPhoto(file, label) {
     if (!file) return null;
-    const compressed = await compressImage(file);
-    const b64 = (await toBase64(compressed)).split(',')[1];
-    const res = await apiCall('uploadPhoto', { empId: state.user.id, date: today(), type: 'return_carrier', label, base64: b64, mimeType: 'image/jpeg' });
-    return res.ok ? res.url : null;
+    return uploadViaChunks(file, 'return_carrier', label);
   }
 
   const [urlOrders, urlPancake] = await Promise.all([
@@ -1544,6 +1538,33 @@ function toBase64(file) {
     r.onload = e => resolve(e.target.result.split(',')[1]);
     r.readAsDataURL(file);
   });
+}
+
+// Upload ảnh bằng cách chia nhỏ thành từng chunk 3KB để vượt giới hạn GET URL
+async function uploadViaChunks(file, type, label) {
+  try {
+    const compressed = await compressImage(file, 600, 0.4);
+    const b64 = (await toBase64(compressed)).split(',')[1];
+    const uuid = Math.random().toString(36).substr(2, 9) + Date.now();
+    const CHUNK = 3000;
+    const chunks = [];
+    for (let i = 0; i < b64.length; i += CHUNK) chunks.push(b64.substr(i, CHUNK));
+
+    for (let i = 0; i < chunks.length; i++) {
+      const res = await apiCall('uploadChunk', { uuid, chunk: chunks[i], index: i });
+      if (!res.ok) return null;
+    }
+
+    const user = JSON.parse(localStorage.getItem('hrUser') || 'null');
+    const res = await apiCall('finalizeUpload', {
+      uuid, totalChunks: chunks.length,
+      empId: user ? user.id : '', date: today(), type, label
+    });
+    return res.ok ? res.url : null;
+  } catch(e) {
+    console.error('uploadViaChunks error:', e);
+    return null;
+  }
 }
 
 // Nén ảnh xuống max 800px, quality 0.5 → ~30-80KB để fit trong GET URL
