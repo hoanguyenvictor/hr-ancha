@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#667eea">
+<title>HR — Boss Dashboard</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+<style>
+  /* Boss-specific overrides */
+  body { padding-bottom: calc(70px + var(--safe-bottom)); background: #f0f2f5; }
+  .emp-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px; background: var(--bg); border-radius: 12px; margin-bottom: 8px;
+    cursor: pointer; transition: all .2s;
+  }
+  .emp-row:hover { background: #e8edf5; }
+  .emp-info { flex: 1; }
+  .emp-name { font-weight: 700; font-size: 0.92rem; }
+  .emp-status { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+  .emp-badges { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+
+  .ot-request {
+    background: #fffbeb; border: 1.5px solid #f59e0b;
+    border-radius: 12px; padding: 14px; margin-bottom: 8px;
+  }
+  .ot-request-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .ot-actions { display: flex; gap: 6px; margin-top: 10px; }
+
+  .salary-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px; background: var(--bg); border-radius: 10px; margin-bottom: 6px;
+  }
+  .salary-total { font-size: 1.1rem; font-weight: 800; color: var(--primary); }
+
+  .alert-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 12px; border-radius: 10px; margin-bottom: 8px;
+  }
+  .alert-item.danger { background: #fee2e2; }
+  .alert-item.warning { background: #fef3c7; }
+
+  .supply-status-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px; border-radius: 8px; margin-bottom: 6px; font-size: 0.85rem;
+  }
+  .supply-ok { background: #f0fdf4; }
+  .supply-low { background: #fee2e2; }
+
+  .tab-bar { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 14px; }
+  .tab-pill {
+    padding: 6px 16px; border-radius: 20px; border: none; background: var(--card);
+    font-size: 0.82rem; font-weight: 600; color: var(--muted); cursor: pointer;
+    white-space: nowrap; box-shadow: var(--shadow);
+  }
+  .tab-pill.active { background: var(--primary); color: white; }
+
+  .detail-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 200; display: flex; align-items: flex-end;
+  }
+  .detail-modal {
+    background: white; border-radius: 24px 24px 0 0;
+    padding: 24px 20px; width: 100%; max-height: 85vh;
+    overflow-y: auto; animation: slideUp .3s ease;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="app-header">
+  <div class="header-row">
+    <div>
+      <h1>👑 Boss Dashboard</h1>
+      <div class="sub" id="headerDate"></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div id="alertBadge" class="hidden" style="background:#ef4444;color:white;border-radius:20px;padding:3px 10px;font-size:0.75rem;font-weight:700"></div>
+      <button onclick="refreshAll()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:8px;padding:6px 10px;font-size:0.75rem;cursor:pointer">🔄</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGES -->
+
+<!-- ── TỔNG QUAN ─────────────────────────────────── -->
+<div class="page active" id="page-overview">
+
+  <!-- Stats tổng -->
+  <div class="stat-grid" style="margin-bottom:12px">
+    <div class="stat-box card" style="margin:0">
+      <div class="stat-num" id="statCheckedIn" style="color:var(--success)">—</div>
+      <div class="stat-label">Đã check-in</div>
+    </div>
+    <div class="stat-box card" style="margin:0">
+      <div class="stat-num" id="statAlerts" style="color:var(--danger)">—</div>
+      <div class="stat-label">Cảnh báo</div>
+    </div>
+    <div class="stat-box card" style="margin:0">
+      <div class="stat-num" id="statTasksDone" style="color:var(--primary)">—</div>
+      <div class="stat-label">Checklist xong</div>
+    </div>
+    <div class="stat-box card" style="margin:0">
+      <div class="stat-num" id="statOTPending" style="color:var(--warning)">—</div>
+      <div class="stat-label">Chờ duyệt OT</div>
+    </div>
+  </div>
+
+  <!-- Cảnh báo ưu tiên -->
+  <div id="priorityAlerts"></div>
+
+  <!-- Danh sách nhân viên -->
+  <div class="card">
+    <div class="card-title"><span class="icon">👥</span>Nhân Viên Hôm Nay</div>
+    <div id="empList">
+      <div style="text-align:center;padding:20px;color:var(--muted)">Đang tải...</div>
+    </div>
+  </div>
+
+  <!-- Tình trạng kho dụng cụ -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📦</span>Tình Trạng Kho Dụng Cụ</div>
+    <div id="supplyOverview">
+      <p style="font-size:0.85rem;color:var(--muted)">Chưa có báo cáo kho hôm nay</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── NHÂN VIÊN CHI TIẾT ─────────────────────────── -->
+<div class="page" id="page-employees">
+  <div class="card">
+    <div class="card-title"><span class="icon">👥</span>Quản Lý Nhân Viên</div>
+    <button class="btn btn-primary btn-sm" onclick="openAddEmpModal()" style="margin-bottom:12px">+ Thêm Nhân Viên</button>
+    <div id="empDetailList"></div>
+  </div>
+</div>
+
+<!-- ── DUYỆT TĂNG CA ──────────────────────────────── -->
+<div class="page" id="page-overtime">
+  <div class="card">
+    <div class="card-title"><span class="icon">⏳</span>Chờ Duyệt</div>
+    <div id="otPendingList"><p style="font-size:0.85rem;color:var(--muted)">Không có đăng ký nào chờ duyệt</p></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="icon">✅</span>Đã Duyệt Tháng Này</div>
+    <div id="otApprovedList"><p style="font-size:0.85rem;color:var(--muted)">Chưa có</p></div>
+  </div>
+</div>
+
+<!-- ── LƯƠNG THÁNG ─────────────────────────────────── -->
+<div class="page" id="page-salary">
+  <div style="background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;border-radius:16px;padding:20px;margin-bottom:12px">
+    <div style="font-size:0.85rem;opacity:0.85;margin-bottom:4px">Tháng <span id="salaryMonth"></span></div>
+    <div style="font-size:1.8rem;font-weight:800" id="totalPayrollDisplay">—</div>
+    <div style="font-size:0.78rem;opacity:0.75;margin-top:4px">Tổng chi lương + thưởng</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">🏆</span>Nhập Thưởng Doanh Số Tháng Này</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Điền thưởng doanh số cho từng nhân viên trước ngày 30/31.</p>
+    <div id="salesBonusInputs"></div>
+    <button class="btn btn-primary" onclick="saveSalesBonus()" style="margin-top:8px">💾 Lưu Thưởng Doanh Số</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">💰</span>Bảng Lương Chi Tiết</div>
+    <div id="salaryTable"></div>
+    <button class="btn btn-success" id="confirmSalaryBtn" onclick="confirmSalary()" style="margin-top:12px">
+      ✅ Xác Nhận & Chốt Lương Tháng
+    </button>
+  </div>
+</div>
+
+<!-- ── LỊCH & PHẠT ─────────────────────────────────── -->
+<div class="page" id="page-schedule">
+  <div class="card">
+    <div class="card-title"><span class="icon">📅</span>Lịch Làm Tuần Này</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="shiftWeek(-1)" style="padding:6px 12px">◀ Tuần trước</button>
+      <span id="schedWeekLabel" style="font-weight:600;font-size:0.85rem;flex:1;text-align:center"></span>
+      <button class="btn btn-sm" onclick="shiftWeek(1)" style="padding:6px 12px">Tuần sau ▶</button>
+    </div>
+    <div id="schedTable" style="overflow-x:auto"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">✏️</span>Sửa Lịch Nhân Viên</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Dùng khi nhân viên xin đổi lịch hoặc đăng ký trễ. Tick "phạt" nếu đăng ký muộn.</p>
+    <div class="form-group">
+      <label>Nhân viên</label>
+      <select id="editSchedEmp" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);font-size:0.88rem"></select>
+    </div>
+    <div class="form-group">
+      <label>Ngày</label>
+      <input type="date" id="editSchedDate" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border)">
+    </div>
+    <div class="form-group">
+      <label>Ca chính</label>
+      <select id="editSchedShift" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);font-size:0.88rem">
+        <option value="fullday">🌞 Cả ngày (8:00–17:30)</option>
+        <option value="morning">☀️ Sáng (8:00–12:00)</option>
+        <option value="afternoon">🌤 Chiều (13:00–17:30)</option>
+        <option value="off">🔴 Nghỉ</option>
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <input type="checkbox" id="editSchedOT" style="width:16px;height:16px">
+      <label for="editSchedOT" style="font-size:0.85rem;font-weight:600;color:var(--primary)">🌙 Có ca ngoài giờ</label>
+    </div>
+    <div id="editSchedOTInputs" style="display:none;background:var(--bg);padding:10px;border-radius:8px;margin-bottom:10px">
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <div style="flex:1"><label style="font-size:0.78rem;color:var(--muted)">Từ</label>
+          <input type="time" id="editSchedOTStart" value="19:30" style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd"></div>
+        <div style="flex:1"><label style="font-size:0.78rem;color:var(--muted)">Đến</label>
+          <input type="time" id="editSchedOTEnd" value="22:00" style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd"></div>
+      </div>
+      <label style="font-size:0.78rem;color:var(--muted)">Số giờ</label>
+      <select id="editSchedOTHours" style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd;font-size:0.85rem">
+        ${[1,2,3,4,5,6,7,8].map(h=>`<option value="${h}"${h===2?' selected':''}>${h} tiếng</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding:10px;background:#fff5f5;border-radius:8px;border:1px solid #fecaca">
+      <input type="checkbox" id="editSchedPenalty" style="width:16px;height:16px">
+      <label for="editSchedPenalty" style="font-size:0.85rem;color:#ef4444;cursor:pointer">⚠️ Phạt đăng ký lịch trễ (−50.000đ)</label>
+    </div>
+    <button class="btn btn-primary" onclick="saveEditSchedule()">💾 Cập Nhật Lịch</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">⚠️</span>Quản Lý Vi Phạm Tháng Này</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Mỗi lần vi phạm trừ 50.000đ. Chị có thể bỏ qua từng trường hợp nếu muốn.</p>
+    <div id="penaltyList"></div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <select id="penaltyEmpSel" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid var(--border);font-size:0.85rem"></select>
+      <select id="penaltyReason" style="flex:2;padding:8px;border-radius:8px;border:1.5px solid var(--border);font-size:0.85rem">
+        <option value="late">Đi muộn</option>
+        <option value="early">Về sớm</option>
+        <option value="late_register">Đăng ký lịch trễ</option>
+        <option value="other">Lý do khác</option>
+      </select>
+      <button class="btn btn-danger btn-sm" onclick="addPenalty()" style="padding:8px 16px">+ Thêm Phạt</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CÀI ĐẶT ────────────────────────────────────── -->
+<div class="page" id="page-settings">
+  <div class="card">
+    <div class="card-title"><span class="icon">⚙️</span>Cấu Hình Hệ Thống</div>
+    <div class="form-group">
+      <label>Google Apps Script URL</label>
+      <input type="url" id="settingScriptUrl" placeholder="https://script.google.com/...">
+    </div>
+    <div class="form-group">
+      <label>Giờ bắt đầu làm (hành chính)</label>
+      <input type="time" id="settingStartTime" value="08:00">
+    </div>
+    <div class="form-group">
+      <label>Bán kính check-in GPS (mét)</label>
+      <input type="number" id="settingRadius" value="100">
+    </div>
+    <div class="form-group">
+      <label>Lương tăng ca (đ/giờ)</label>
+      <input type="number" id="settingOTRate" value="26000">
+    </div>
+    <button class="btn btn-primary" onclick="saveSettings()">💾 Lưu Cấu Hình</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">📋</span>Nhiệm Vụ Hàng Ngày</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Thêm/bớt nhiệm vụ checklist sáng/chiều.</p>
+    <div id="taskEditor"></div>
+    <button class="btn btn-outline btn-sm" onclick="addTask()" style="margin-top:8px">+ Thêm Nhiệm Vụ</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">🔗</span>Link Cho Nhân Viên</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px">Gửi link này cho nhân viên để cài app:</p>
+    <div style="background:var(--bg);border-radius:10px;padding:12px;font-size:0.82rem;word-break:break-all;color:var(--primary)" id="employeeLink">
+      Chưa deploy — xem hướng dẫn bên dưới
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="copyEmployeeLink()" style="margin-top:8px">📋 Copy Link</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">📖</span>Hướng Dẫn Setup Google Sheets</div>
+    <div id="setupGuide" style="font-size:0.83rem;line-height:1.7;color:var(--text)">
+      <p><b>Bước 1 — Tạo Google Sheet</b></p>
+      <p style="color:var(--muted);margin-bottom:10px">Mở Google Sheets, tạo file mới tên "HR System"</p>
+
+      <p><b>Bước 2 — Tạo Apps Script</b></p>
+      <p style="color:var(--muted);margin-bottom:10px">Trong Sheet: Extensions → Apps Script → paste code từ file <code>google-apps-script.js</code></p>
+
+      <p><b>Bước 3 — Deploy</b></p>
+      <p style="color:var(--muted);margin-bottom:10px">Deploy → New Deployment → Web App → Execute as Me → Anyone → Copy URL</p>
+
+      <p><b>Bước 4 — Điền URL</b></p>
+      <p style="color:var(--muted)">Paste URL vào ô "Google Apps Script URL" ở trên → Lưu</p>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="nav-item active" onclick="switchPage('overview',this)">
+    <span class="icon">🏠</span><span>Tổng Quan</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('employees',this)">
+    <span class="icon">👥</span><span>Nhân Viên</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('overtime',this)" style="position:relative">
+    <span class="icon">🌙</span><span>Tăng Ca</span>
+    <div class="notif-dot hidden" id="otDot"></div>
+  </button>
+  <button class="nav-item" onclick="switchPage('salary',this)">
+    <span class="icon">💰</span><span>Lương</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('schedule',this)">
+    <span class="icon">📅</span><span>Lịch</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('settings',this)">
+    <span class="icon">⚙️</span><span>Cài Đặt</span>
+  </button>
+</nav>
+
+<!-- EMPLOYEE DETAIL MODAL -->
+<div class="detail-modal-overlay hidden" id="empDetailModal">
+  <div class="detail-modal">
+    <div class="modal-handle"></div>
+    <div id="empDetailContent"></div>
+    <button class="btn" onclick="closeEmpDetail()" style="background:var(--bg);color:var(--muted);margin-top:12px">Đóng</button>
+  </div>
+</div>
+
+<!-- ADD EMPLOYEE MODAL -->
+<div class="detail-modal-overlay hidden" id="addEmpModal">
+  <div class="detail-modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">➕ Thêm Nhân Viên</div>
+    <div class="form-group">
+      <label>Họ Tên</label>
+      <input type="text" id="newEmpName" placeholder="Nguyễn Văn A">
+    </div>
+    <div class="form-group">
+      <label>Mã Nhân Viên</label>
+      <input type="text" id="newEmpCode" placeholder="NV001">
+    </div>
+    <div class="form-group">
+      <label>Mật Khẩu</label>
+      <input type="password" id="newEmpPass" placeholder="Tối thiểu 6 ký tự">
+    </div>
+    <div class="form-group">
+      <label>Số Điện Thoại</label>
+      <input type="tel" id="newEmpPhone" placeholder="0909...">
+    </div>
+    <div class="form-group">
+      <label>Lương Cứng (đ/tháng)</label>
+      <input type="number" id="newEmpSalary" placeholder="VD: 5000000">
+    </div>
+    <div class="form-group">
+      <label>Màu Đại Diện</label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px" id="colorSwatches">
+        <div onclick="selectColor('#667eea')" style="width:36px;height:36px;border-radius:50%;background:#667eea;cursor:pointer;border:3px solid #667eea;box-shadow:0 0 0 2px white inset"></div>
+        <div onclick="selectColor('#ec4899')" style="width:36px;height:36px;border-radius:50%;background:#ec4899;cursor:pointer;border:3px solid transparent"></div>
+        <div onclick="selectColor('#22c55e')" style="width:36px;height:36px;border-radius:50%;background:#22c55e;cursor:pointer;border:3px solid transparent"></div>
+        <div onclick="selectColor('#f59e0b')" style="width:36px;height:36px;border-radius:50%;background:#f59e0b;cursor:pointer;border:3px solid transparent"></div>
+        <div onclick="selectColor('#ef4444')" style="width:36px;height:36px;border-radius:50%;background:#ef4444;cursor:pointer;border:3px solid transparent"></div>
+        <div onclick="selectColor('#3b82f6')" style="width:36px;height:36px;border-radius:50%;background:#3b82f6;cursor:pointer;border:3px solid transparent"></div>
+        <div onclick="selectColor('#8b5cf6')" style="width:36px;height:36px;border-radius:50%;background:#8b5cf6;cursor:pointer;border:3px solid transparent"></div>
+        <div onclick="selectColor('#14b8a6')" style="width:36px;height:36px;border-radius:50%;background:#14b8a6;cursor:pointer;border:3px solid transparent"></div>
+        <div onclick="selectColor('#f97316')" style="width:36px;height:36px;border-radius:50%;background:#f97316;cursor:pointer;border:3px solid transparent"></div>
+      </div>
+      <input type="hidden" id="newEmpColor" value="#667eea">
+    </div>
+    <button class="btn btn-primary" onclick="saveNewEmployee()">💾 Lưu Nhân Viên</button>
+    <button class="btn" onclick="document.getElementById('addEmpModal').classList.add('hidden')" style="background:var(--bg);color:var(--muted);margin-top:8px">Huỷ</button>
+  </div>
+</div>
+
+<script src="db.js"></script>
+<script>
+// ─── STATE ─────────────────────────────────────────────
+let employees = [];
+let todayReports = {};
+let overtimeRequests = [];
+let salaryData = {};
+
+// ─── INIT ──────────────────────────────────────────────
+async function init() {
+  document.getElementById('headerDate').textContent =
+    new Date().toLocaleDateString('vi-VN', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+  document.getElementById('salaryMonth').textContent = monthKey();
+
+  loadSettings();
+  await refreshAll();
+  setInterval(refreshAll, 120000); // Auto refresh 2 phút
+}
+
+async function refreshAll() {
+  await Promise.all([
+    loadEmployees(),
+    loadTodayReports(),
+    loadOvertimeRequests(),
+    loadSalaryData(),
+  ]);
+  renderOverview();
+  renderEmployeeList();
+  renderOvertimeTab();
+  renderSalaryTab();
+}
+
+// ─── DATA LOADING ──────────────────────────────────────
+async function loadEmployees() {
+  // Đọc localStorage trước (luôn có dữ liệu mới nhất khi offline)
+  const local = JSON.parse(localStorage.getItem('employees') || '[]');
+  // Bỏ passHash khi đưa vào state
+  employees = local.map(({ passHash, ...e }) => e);
+
+  // Nếu đã cấu hình Google Sheets thì sync từ Sheet (Sheet là nguồn sự thật)
+  if (DB_CONFIG.SCRIPT_URL && DB_CONFIG.SCRIPT_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL') {
+    try {
+      const res = await apiCall('getEmployees');
+      if (res.ok && res.data !== undefined) {
+        employees = res.data;
+        localStorage.setItem('employees', JSON.stringify(res.data));
+      }
+    } catch(e) {}
+  }
+}
+
+async function loadTodayReports() {
+  const res = await apiCall('getTodayReports', { date: today() });
+  if (res.ok && res.data) todayReports = res.data;
+}
+
+async function loadOvertimeRequests() {
+  const res = await apiCall('getOvertimeRequests', { month: monthKey() });
+  if (res.ok && res.data) overtimeRequests = res.data;
+  const pending = overtimeRequests.filter(r => !r.approved && !r.rejected);
+  document.getElementById('otDot').classList.toggle('hidden', pending.length === 0);
+  document.getElementById('statOTPending').textContent = pending.length;
+}
+
+async function loadSalaryData() {
+  const res = await apiCall('getSalaryData', { month: monthKey() });
+  if (res.ok && res.data) salaryData = res.data;
+  await loadPenalties();
+}
+
+async function loadPenalties() {
+  const res = await apiCall('getPenalties', { month: monthKey() });
+  if (res.ok && res.data) {
+    penalties = res.data;
+    localStorage.setItem('penalties', JSON.stringify(penalties));
+    syncPenaltiesToSalary();
+  }
+}
+
+// ─── OVERVIEW ──────────────────────────────────────────
+function renderOverview() {
+  const checkedIn = employees.filter(e => todayReports[e.id]?.checkin).length;
+  document.getElementById('statCheckedIn').textContent = `${checkedIn}/${employees.length}`;
+
+  // Alerts
+  const alerts = buildAlerts();
+  document.getElementById('statAlerts').textContent = alerts.length;
+  if (alerts.length > 0) {
+    document.getElementById('alertBadge').textContent = `${alerts.length} cảnh báo`;
+    document.getElementById('alertBadge').classList.remove('hidden');
+  }
+
+  // Priority alerts
+  const alertEl = document.getElementById('priorityAlerts');
+  alertEl.innerHTML = alerts.slice(0, 5).map(a => `
+    <div class="alert-item ${a.type}" style="margin-bottom:8px">
+      <span style="font-size:1.1rem">${a.type==='danger'?'🚨':'⚠️'}</span>
+      <div>
+        <div style="font-size:0.85rem;font-weight:600">${a.title}</div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:2px">${a.desc}</div>
+      </div>
+    </div>`).join('');
+
+  // Task stats
+  let totalTasks = 0, doneTasks = 0;
+  employees.forEach(e => {
+    const r = todayReports[e.id];
+    if (!r) return;
+    const taskCount = 10; // morning(5) + afternoon(5)
+    const done = Object.values(r.checklist || {}).filter(Boolean).length;
+    totalTasks += taskCount; doneTasks += done;
+  });
+  document.getElementById('statTasksDone').textContent = `${doneTasks}/${totalTasks}`;
+
+  // Employee list
+  const empList = document.getElementById('empList');
+  if (!employees.length) {
+    empList.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted)">
+      <div style="font-size:2rem;margin-bottom:8px">👥</div>
+      Chưa có nhân viên — <a onclick="switchPage('employees')" style="color:var(--primary);cursor:pointer">Thêm ngay</a>
+    </div>`;
+    return;
+  }
+  empList.innerHTML = employees.map(e => empRowHTML(e)).join('');
+
+  // Supply overview
+  renderSupplyOverview();
+}
+
+function empRowHTML(emp) {
+  const r = todayReports[emp.id] || {};
+  const checkin = r.checkin || null;
+  const allTasks = 10;
+  const done = Object.values(r.checklist || {}).filter(Boolean).length;
+  const alerts = buildEmpAlerts(emp, r);
+
+  const initials = emp.name.split(' ').slice(-2).map(w=>w[0]).join('').toUpperCase();
+  return `<div class="emp-row" onclick="showEmpDetail('${emp.id}')">
+    <div class="avatar" style="background:${emp.color||'#667eea'}">${initials}</div>
+    <div class="emp-info">
+      <div class="emp-name">${emp.name}</div>
+      <div class="emp-status">${checkin ? `Check-in ${checkin}${r.late?' ⚠️ Trễ '+r.lateMin+'p':''}` : '❌ Chưa check-in'} · ${done}/${allTasks} việc</div>
+      <div class="emp-badges">
+        ${alerts.map(a => `<span class="badge badge-${a.type}" style="font-size:0.65rem">${a.short}</span>`).join('')}
+        ${r.activeShift ? '<span class="badge badge-warning" style="font-size:0.65rem">🌙 Ca tối</span>' : ''}
+      </div>
+    </div>
+    <span style="color:var(--muted);font-size:0.8rem">›</span>
+  </div>`;
+}
+
+function buildAlerts() {
+  const alerts = [];
+  const hour = new Date().getHours();
+  employees.forEach(emp => {
+    const r = todayReports[emp.id] || {};
+    if (!r.checkin && hour >= 9) {
+      alerts.push({ type: 'danger', title: `${emp.name} chưa check-in`, desc: `Đã ${hour}h mà chưa vào làm`, empId: emp.id });
+    }
+    if (r.supply?.hasAlert) {
+      alerts.push({ type: 'warning', title: 'Dụng cụ kho sắp hết', desc: `${emp.name} báo cáo tồn kho thấp`, empId: emp.id });
+    }
+    if (hour >= 17) {
+      const pendingAfternoon = ['a1','a2','a3','a4','a5'].filter(id => !r.checklist?.[id]);
+      if (pendingAfternoon.length > 0) {
+        alerts.push({ type: 'warning', title: `${emp.name} chưa xong checklist chiều`, desc: `Còn ${pendingAfternoon.length} việc`, empId: emp.id });
+      }
+    }
+    if (r.pingMiss) {
+      alerts.push({ type: 'danger', title: `${emp.name} không phản hồi ping`, desc: `Ca tối — không xác nhận đang làm`, empId: emp.id });
+    }
+  });
+  return alerts;
+}
+
+function buildEmpAlerts(emp, r) {
+  const alerts = [];
+  const hour = new Date().getHours();
+  if (!r.checkin && hour >= 9) alerts.push({ type: 'danger', short: 'Chưa check-in' });
+  if (r.late) alerts.push({ type: 'warning', short: `Trễ ${r.lateMin}p` });
+  if (r.supply?.hasAlert) alerts.push({ type: 'warning', short: 'Kho thấp' });
+  if (r.pingMiss) alerts.push({ type: 'danger', short: 'Miss ping' });
+  return alerts;
+}
+
+function renderSupplyOverview() {
+  const SUPPLY_LABELS = {
+    carton_30x20x10: 'Hộp 30×20×10', carton_25x20x10: 'Hộp 25×20×10',
+    carton_15x10x10: 'Hộp 15×10×10', tape: 'Băng dính',
+    bubble_wrap: 'Xốp chống sốc', print_paper: 'Giấy in'
+  };
+  const SUPPLY_ALERT = DB_CONFIG.SUPPLY_ALERT;
+
+  // Find latest supply report
+  let latestSupply = null;
+  employees.forEach(e => {
+    if (todayReports[e.id]?.supply) latestSupply = todayReports[e.id].supply;
+  });
+
+  if (!latestSupply || !latestSupply.data) {
+    document.getElementById('supplyOverview').innerHTML =
+      `<p style="font-size:0.85rem;color:var(--muted)">Chưa có báo cáo kho hôm nay</p>`;
+    return;
+  }
+
+  const html = Object.entries(SUPPLY_LABELS).map(([key, label]) => {
+    const qty = latestSupply.data[key];
+    const alert = SUPPLY_ALERT[key] || 0;
+    const low = qty !== null && qty !== undefined && qty < alert;
+    return `<div class="supply-status-item ${low?'supply-low':'supply-ok'}">
+      <span>${label}</span>
+      <span style="font-weight:700;color:${low?'var(--danger)':'var(--success)'}">${qty ?? '—'} ${low?'⚠️':''}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('supplyOverview').innerHTML = html;
+}
+
+// ─── EMPLOYEE DETAIL ───────────────────────────────────
+function showEmpDetail(empId) {
+  const emp = employees.find(e => e.id === empId);
+  if (!emp) return;
+  const r = todayReports[empId] || {};
+  const MORNING = ['m1','m2','m3','m4','m5'];
+  const AFTERNOON = ['a1','a2','a3','a4','a5'];
+  const TASK_NAMES = {
+    m1:'Dọn dẹp VP',m2:'Lau bàn ghế',m3:'Kiểm máy móc',m4:'Chuẩn bị dụng cụ',m5:'Check đơn hàng',
+    a1:'Dọn dẹp cuối ngày',a2:'Xếp hàng hoá',a3:'Thu dọn dụng cụ',a4:'Tắt thiết bị',a5:'Khoá cửa'
+  };
+  const initials = emp.name.split(' ').slice(-2).map(w=>w[0]).join('').toUpperCase();
+
+  document.getElementById('empDetailContent').innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div class="avatar" style="background:${emp.color||'#667eea'};width:52px;height:52px;font-size:1.2rem">${initials}</div>
+      <div>
+        <div style="font-weight:800;font-size:1rem">${emp.name}</div>
+        <div style="font-size:0.78rem;color:var(--muted)">${emp.phone || ''}</div>
+      </div>
+    </div>
+
+    <div class="stat-grid" style="margin-bottom:14px">
+      <div class="stat-box"><div class="stat-num" style="color:${r.checkin?'var(--success)':'var(--danger)'};font-size:1.1rem">${r.checkin||'—'}</div><div class="stat-label">Check-in</div></div>
+      <div class="stat-box"><div class="stat-num" style="font-size:1.1rem">${r.checkout||'—'}</div><div class="stat-label">Check-out</div></div>
+    </div>
+
+    <div style="font-size:0.82rem;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Checklist Sáng</div>
+    ${MORNING.map(id => `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:0.85rem;border-bottom:1px solid var(--border)">
+      <span>${r.checklist?.[id]?'✅':'⬜'}</span>
+      <span style="${r.checklist?.[id]?'':'color:var(--muted)'}">${TASK_NAMES[id]}</span>
+    </div>`).join('')}
+
+    <div style="font-size:0.82rem;font-weight:700;color:var(--muted);margin:12px 0 8px;text-transform:uppercase">Checklist Chiều</div>
+    ${AFTERNOON.map(id => `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:0.85rem;border-bottom:1px solid var(--border)">
+      <span>${r.checklist?.[id]?'✅':'⬜'}</span>
+      <span style="${r.checklist?.[id]?'':'color:var(--muted)'}">${TASK_NAMES[id]}</span>
+    </div>`).join('')}
+
+    ${r.supply ? `
+    <div style="font-size:0.82rem;font-weight:700;color:var(--muted);margin:12px 0 8px;text-transform:uppercase">Báo Cáo Kho</div>
+    <div style="font-size:0.83rem;background:var(--bg);border-radius:8px;padding:10px">
+      ${Object.entries(r.supply.data||{}).map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:3px 0"><span>${k}</span><b>${v}</b></div>`).join('')}
+    </div>` : ''}
+
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn btn-warning btn-sm" onclick="addDeduction('${empId}')">⚠️ Thêm Trừ Thưởng</button>
+      <button class="btn btn-success btn-sm" onclick="approveAllTasks('${empId}')">✅ Xác Nhận OK</button>
+    </div>
+  `;
+  document.getElementById('empDetailModal').classList.remove('hidden');
+}
+
+function closeEmpDetail() { document.getElementById('empDetailModal').classList.add('hidden'); }
+
+async function addDeduction(empId) {
+  const reason = prompt('Lý do trừ thưởng:');
+  if (!reason) return;
+  const amount = prompt('Số tiền trừ (đ):');
+  if (!amount || isNaN(amount)) return;
+  await apiCall('addDeduction', { empId, month: monthKey(), reason, amount: Number(amount), date: today() });
+  showToast(`✅ Đã thêm trừ ${formatVND(amount)} cho nhân viên`, 'success');
+  await loadSalaryData();
+  renderSalaryTab();
+}
+
+async function approveAllTasks(empId) {
+  await apiCall('approveDay', { empId, date: today() });
+  showToast('✅ Đã xác nhận hoàn thành ngày làm việc!', 'success');
+  closeEmpDetail();
+}
+
+// ─── EMPLOYEE MANAGEMENT ───────────────────────────────
+function renderEmployeeList() {
+  const list = document.getElementById('empDetailList');
+  list.innerHTML = employees.map(emp => {
+    const initials = emp.name.split(' ').slice(-2).map(w=>w[0]).join('').toUpperCase();
+    return `<div class="emp-row" onclick="showEmpDetail('${emp.id}')">
+      <div class="avatar" style="background:${emp.color||'#667eea'}">${initials}</div>
+      <div class="emp-info">
+        <div class="emp-name">${emp.name}</div>
+        <div class="emp-status">Mã: ${emp.id} · Lương: ${formatVND(emp.salary||0)}</div>
+      </div>
+    </div>`;
+  }).join('') || `<p style="color:var(--muted);font-size:0.85rem">Chưa có nhân viên nào</p>`;
+}
+
+function openAddEmpModal() {
+  document.getElementById('addEmpModal').classList.remove('hidden');
+  selectColor('#667eea'); // reset màu mặc định
+}
+
+function selectColor(hex) {
+  document.getElementById('newEmpColor').value = hex;
+  document.querySelectorAll('#colorSwatches div').forEach(el => {
+    const isSelected = el.style.background === hexToRgb(hex) || el.getAttribute('onclick') === `selectColor('${hex}')`;
+    el.style.border = isSelected ? `3px solid ${hex}` : '3px solid transparent';
+    el.style.transform = isSelected ? 'scale(1.15)' : 'scale(1)';
+  });
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+async function saveNewEmployee() {
+  const name = document.getElementById('newEmpName').value.trim();
+  const code = document.getElementById('newEmpCode').value.trim().toUpperCase();
+  const pass = document.getElementById('newEmpPass').value;
+  const phone = document.getElementById('newEmpPhone').value.trim();
+  const salary = Number(document.getElementById('newEmpSalary').value);
+  const color = document.getElementById('newEmpColor').value;
+  if (!name || !code || !pass) { showToast('Điền đủ họ tên, mã NV và mật khẩu!', 'danger'); return; }
+  if (pass.length < 4) { showToast('Mật khẩu tối thiểu 4 ký tự!', 'danger'); return; }
+  if (employees.find(e => e.id === code)) { showToast('Mã nhân viên đã tồn tại!', 'danger'); return; }
+
+  const emp = { id: code, name, phone, salary, color, created: today() };
+
+  // Lưu localStorage trước — không cần Google Sheets
+  const stored = JSON.parse(localStorage.getItem('employees') || '[]');
+  stored.push({ ...emp, passHash: btoa(pass) });
+  localStorage.setItem('employees', JSON.stringify(stored));
+  employees.push(emp);
+
+  // Gửi lên Google Sheets nếu đã cấu hình (nền, không block UI)
+  if (DB_CONFIG.SCRIPT_URL && DB_CONFIG.SCRIPT_URL !== 'YOUR_GOOGLE_APPS_SCRIPT_URL') {
+    apiCall('addEmployee', { emp, pass }).catch(() => {});
+  }
+
+  document.getElementById('addEmpModal').classList.add('hidden');
+  // Reset form
+  ['newEmpName','newEmpCode','newEmpPass','newEmpPhone','newEmpSalary'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  showToast(`✅ Đã thêm ${name}! Mã đăng nhập: ${code}`, 'success');
+  renderEmployeeList();
+  renderOverview();
+}
+
+// ─── OVERTIME ──────────────────────────────────────────
+function renderOvertimeTab() {
+  const pending = overtimeRequests.filter(r => !r.approved && !r.rejected);
+  const approved = overtimeRequests.filter(r => r.approved);
+
+  document.getElementById('otPendingList').innerHTML = pending.length ?
+    pending.map(r => {
+      const emp = employees.find(e => e.id === r.empId);
+      return `<div class="ot-request">
+        <div class="ot-request-header">
+          <div>
+            <div style="font-weight:700;font-size:0.9rem">${emp?.name||r.empId}</div>
+            <div style="font-size:0.78rem;color:var(--muted)">${formatDateVN(r.date)} · ${r.start}–${r.end}</div>
+          </div>
+          <span class="badge badge-warning">Chờ duyệt</span>
+        </div>
+        ${r.plan ? `<div style="font-size:0.82rem;color:var(--muted);margin-bottom:4px">📋 ${r.plan}</div>` : ''}
+        <div class="ot-actions">
+          <button class="btn btn-success btn-sm" onclick="approveOT('${r.id}')">✅ Duyệt</button>
+          <button class="btn btn-danger btn-sm" onclick="rejectOT('${r.id}')">❌ Từ Chối</button>
+        </div>
+      </div>`;
+    }).join('') :
+    `<p style="font-size:0.85rem;color:var(--muted)">Không có đăng ký nào chờ duyệt 🎉</p>`;
+
+  document.getElementById('otApprovedList').innerHTML = approved.length ?
+    approved.map(r => {
+      const emp = employees.find(e => e.id === r.empId);
+      return `<div style="background:var(--bg);border-radius:10px;padding:10px;margin-bottom:6px;font-size:0.83rem">
+        <div style="display:flex;justify-content:space-between">
+          <b>${emp?.name||r.empId}</b>
+          <span style="color:var(--success)">${r.hours||'—'}h · ${formatVND((r.hours||0)*DB_CONFIG.OVERTIME_RATE)}</span>
+        </div>
+        <div style="color:var(--muted);margin-top:2px">${formatDateVN(r.date)} · ${r.start}–${r.end}</div>
+      </div>`;
+    }).join('') :
+    `<p style="font-size:0.85rem;color:var(--muted)">Chưa có ca nào được duyệt</p>`;
+}
+
+async function approveOT(id) {
+  await apiCall('approveOT', { id });
+  showToast('✅ Đã duyệt tăng ca!', 'success');
+  await loadOvertimeRequests();
+  renderOvertimeTab();
+}
+
+async function rejectOT(id) {
+  const reason = prompt('Lý do từ chối (tuỳ chọn):') || '';
+  await apiCall('rejectOT', { id, reason });
+  showToast('❌ Đã từ chối', 'warning');
+  await loadOvertimeRequests();
+  renderOvertimeTab();
+}
+
+// ─── SALARY ────────────────────────────────────────────
+function renderSalaryTab() {
+  // Sales bonus inputs
+  document.getElementById('salesBonusInputs').innerHTML = employees.map(emp => {
+    const existing = salaryData[emp.id]?.salesBonus || '';
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="flex:1;font-size:0.88rem;font-weight:600">${emp.name}</div>
+      <input type="number" id="sales_${emp.id}" value="${existing}" placeholder="1000000"
+        style="width:140px;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:0.88rem;text-align:right">
+      <span style="font-size:0.78rem;color:var(--muted)">đ</span>
+    </div>`;
+  }).join('');
+
+  // Salary table
+  let totalPayroll = 0;
+  const rows = employees.map(emp => {
+    const d = salaryData[emp.id] || {};
+    const baseSalary = emp.salary || 0;
+    const otHours = d.otHours || 0;
+    const otPay = otHours * DB_CONFIG.OVERTIME_RATE;
+    const attendance = d.attendanceBonus ?? DB_CONFIG.BONUS_ATTENDANCE;
+    const tasks = d.tasksBonus ?? DB_CONFIG.BONUS_TASKS;
+    const sales = d.salesBonus || 0;
+    const deductions = (d.deductions || []).reduce((s,x) => s + x.amount, 0);
+    const total = baseSalary + otPay + attendance + tasks + sales - deductions;
+    totalPayroll += total;
+    return { emp, baseSalary, otHours, otPay, attendance, tasks, sales, deductions, total };
+  });
+
+  document.getElementById('totalPayrollDisplay').textContent = formatVND(totalPayroll);
+
+  document.getElementById('salaryTable').innerHTML = rows.map(r => `
+    <div style="border-radius:12px;border:1.5px solid var(--border);padding:14px;margin-bottom:10px">
+      <div style="font-weight:800;margin-bottom:10px;font-size:0.95rem">${r.emp.name}</div>
+      <div style="font-size:0.82rem">
+        ${salaryLine('Lương cứng', r.baseSalary)}
+        <div style="display:flex;justify-content:space-between;padding:3px 0;color:${r.otHours > 0 ? 'var(--text)' : 'var(--muted)'}">
+          <span>🌙 Lương ngoài giờ (${r.otHours}h × ${formatVND(DB_CONFIG.OVERTIME_RATE)})</span>
+          <b>${formatVND(r.otPay)}</b>
+        </div>
+        ${salaryLine('Thưởng chuyên cần', r.attendance)}
+        ${salaryLine('Thưởng nhiệm vụ', r.tasks)}
+        ${salaryLine('Thưởng doanh số', r.sales)}
+        ${r.deductions > 0 ? salaryLine('Trừ vi phạm', -r.deductions, true) : ''}
+      </div>
+      <div style="border-top:2px solid var(--border);margin-top:10px;padding-top:10px;display:flex;justify-content:space-between">
+        <span style="font-weight:700">TỔNG NHẬN</span>
+        <span class="salary-total">${formatVND(r.total)}</span>
+      </div>
+    </div>`).join('') || `<p style="color:var(--muted);font-size:0.85rem">Chưa có dữ liệu nhân viên</p>`;
+}
+
+function salaryLine(label, amount, isDanger=false) {
+  if (!amount) return '';
+  return `<div style="display:flex;justify-content:space-between;padding:3px 0;color:${isDanger?'var(--danger)':'var(--text)'}">
+    <span>${label}</span><b>${isDanger?'-':''}${formatVND(Math.abs(amount))}</b>
+  </div>`;
+}
+
+async function saveSalesBonus() {
+  const bonuses = {};
+  employees.forEach(emp => {
+    const val = document.getElementById(`sales_${emp.id}`)?.value;
+    if (val) bonuses[emp.id] = Number(val);
+  });
+  await apiCall('saveSalesBonus', { month: monthKey(), bonuses });
+  showToast('✅ Đã lưu thưởng doanh số!', 'success');
+  await loadSalaryData();
+  renderSalaryTab();
+}
+
+async function confirmSalary() {
+  if (!confirm('Xác nhận chốt lương tháng này? Nhân viên sẽ thấy bảng lương đã xác nhận.')) return;
+  await apiCall('confirmSalary', { month: monthKey() });
+  showToast('✅ Đã chốt lương! Nhân viên đã được thông báo.', 'success');
+}
+
+// ─── SETTINGS ──────────────────────────────────────────
+function loadSettings() {
+  const s = JSON.parse(localStorage.getItem('hrSettings') || '{}');
+  if (s.scriptUrl) {
+    DB_CONFIG.SCRIPT_URL = s.scriptUrl;
+    document.getElementById('settingScriptUrl').value = s.scriptUrl;
+  }
+  if (s.radius) document.getElementById('settingRadius').value = s.radius;
+  if (s.otRate) document.getElementById('settingOTRate').value = s.otRate;
+}
+
+function saveSettings() {
+  const s = {
+    scriptUrl: document.getElementById('settingScriptUrl').value.trim(),
+    startTime: document.getElementById('settingStartTime').value,
+    radius: Number(document.getElementById('settingRadius').value),
+    otRate: Number(document.getElementById('settingOTRate').value),
+  };
+  DB_CONFIG.SCRIPT_URL = s.scriptUrl;
+  DB_CONFIG.OFFICE_RADIUS_M = s.radius;
+  DB_CONFIG.OVERTIME_RATE = s.otRate;
+  localStorage.setItem('hrSettings', JSON.stringify(s));
+  showToast('✅ Đã lưu cấu hình!', 'success');
+}
+
+function copyEmployeeLink() {
+  const link = window.location.href.replace('index.html', 'employee.html');
+  navigator.clipboard.writeText(link).then(()=>showToast('✅ Đã copy link nhân viên!','success'));
+}
+
+// ─── UTILS ─────────────────────────────────────────────
+// ─── SCHEDULE TAB ──────────────────────────────────────
+let schedWeekOffset = 0;
+let weeklySchedule = {};
+let penalties = JSON.parse(localStorage.getItem('penalties') || '[]');
+
+const DAY_NAMES_SHORT = ['T2','T3','T4','T5','T6','T7','CN'];
+const DAY_KEYS = ['mon','tue','wed','thu','fri','sat','sun'];
+const SHIFT_LABEL = { fullday:'Cả ngày', morning:'Sáng', afternoon:'Chiều', off:'Nghỉ', '':'—' };
+
+function getWeekDates(offset = 0) {
+  const now = new Date();
+  const day = now.getDay();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
+  return DAY_KEYS.map((_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d.toISOString().slice(0,10);
+  });
+}
+
+function shiftWeek(delta) {
+  schedWeekOffset += delta;
+  renderScheduleTab();
+}
+
+async function renderScheduleTab() {
+  const dates = getWeekDates(schedWeekOffset);
+  const weekStart = dates[0];
+  document.getElementById('schedWeekLabel').textContent =
+    `${formatDateVN(dates[0])} – ${formatDateVN(dates[6])}`;
+
+  const res = await apiCall('getWeeklySchedule', { weekStart });
+  weeklySchedule = (res.ok && res.data) ? res.data : {};
+
+  // Bảng lịch: cột = ngày, hàng = nhân viên
+  const colHead = `<tr><th style="padding:6px 8px;text-align:left;font-size:0.78rem;color:var(--muted);min-width:80px">Nhân viên</th>
+    ${dates.map((d,i) => `<th style="padding:6px 4px;text-align:center;font-size:0.75rem;white-space:nowrap">${DAY_NAMES_SHORT[i]}<br><span style="color:var(--muted);font-weight:400">${d.slice(5)}</span></th>`).join('')}</tr>`;
+
+  const rows = employees.map(emp => {
+    const empSched = weeklySchedule[emp.id] || {};
+    const cells = DAY_KEYS.map((key, i) => {
+      const s = empSched[key] || {};
+      const shift = s.shift || 'off';
+      const hasOT = s.hasOT;
+      const color = { fullday:'#7c3aed', morning:'#2563eb', afternoon:'#0891b2', off:'#9ca3af' }[shift] || '#9ca3af';
+      const otDot = hasOT ? `<span style="display:inline-block;width:6px;height:6px;background:#f59e0b;border-radius:50%;margin-left:2px;vertical-align:middle"></span>` : '';
+      return `<td style="padding:4px;text-align:center">
+        <span style="font-size:0.72rem;font-weight:600;color:${color}">${SHIFT_LABEL[shift]}${otDot}</span>
+      </td>`;
+    }).join('');
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:6px 8px;font-size:0.82rem;font-weight:600;white-space:nowrap">${emp.name.split(' ').pop()}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  document.getElementById('schedTable').innerHTML = employees.length
+    ? `<table style="width:100%;border-collapse:collapse">${colHead}${rows}</table>
+       <div style="font-size:0.72rem;color:var(--muted);margin-top:6px">🟡 = có ca ngoài giờ</div>`
+    : `<p style="color:var(--muted);font-size:0.85rem">Chưa có nhân viên</p>`;
+
+  // Populate selects
+  const empOptions = employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+  document.getElementById('editSchedEmp').innerHTML = empOptions;
+  document.getElementById('penaltyEmpSel').innerHTML = empOptions;
+
+  renderPenaltyList();
+}
+
+document.getElementById('editSchedOT').addEventListener('change', function() {
+  document.getElementById('editSchedOTInputs').style.display = this.checked ? 'block' : 'none';
+});
+
+async function saveEditSchedule() {
+  const empId = document.getElementById('editSchedEmp').value;
+  const date  = document.getElementById('editSchedDate').value;
+  const shift = document.getElementById('editSchedShift').value;
+  const hasOT = document.getElementById('editSchedOT').checked;
+  const penalty = document.getElementById('editSchedPenalty').checked;
+  if (!empId || !date) { showToast('Chọn nhân viên và ngày!', 'danger'); return; }
+
+  const payload = { empId, date, shift, hasOT };
+  if (hasOT) {
+    payload.eveningStart  = document.getElementById('editSchedOTStart').value;
+    payload.eveningEnd    = document.getElementById('editSchedOTEnd').value;
+    payload.plannedHours  = Number(document.getElementById('editSchedOTHours').value);
+  }
+
+  // Tính weekStart từ date
+  const d = new Date(date);
+  const day = d.getDay();
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  const weekStart = mon.toISOString().slice(0,10);
+  const dayKey = DAY_KEYS[day === 0 ? 6 : day - 1];
+
+  await apiCall('editSchedule', { empId, weekStart, dayKey, date, shift, hasOT,
+    eveningStart: payload.eveningStart, eveningEnd: payload.eveningEnd,
+    plannedHours: payload.plannedHours });
+
+  if (penalty) {
+    const emp = employees.find(e => e.id === empId);
+    addPenaltyRecord(empId, emp?.name || empId, 'late_register', date);
+  }
+
+  showToast('✅ Đã cập nhật lịch!', 'success');
+  await renderScheduleTab();
+}
+
+function renderPenaltyList() {
+  const month = monthKey();
+  const monthPenalties = penalties.filter(p => p.month === month);
+  const REASON_LABEL = { late:'Đi muộn', early:'Về sớm', late_register:'Đăng ký lịch trễ', other:'Lý do khác' };
+
+  document.getElementById('penaltyList').innerHTML = monthPenalties.length
+    ? monthPenalties.map((p, idx) => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee;font-size:0.83rem">
+        <div>
+          <span style="font-weight:600">${p.empName}</span>
+          <span style="color:var(--muted);margin-left:6px">${REASON_LABEL[p.reason]||p.reason} · ${p.date||''}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="color:#ef4444;font-weight:700">−50.000đ</span>
+          <button onclick="removePenalty(${idx})" style="border:none;background:none;cursor:pointer;color:var(--muted);font-size:1rem">🗑</button>
+        </div>
+      </div>`).join('')
+    : `<p style="font-size:0.85rem;color:var(--muted)">Chưa có vi phạm nào tháng này 🎉</p>`;
+}
+
+function addPenaltyRecord(empId, empName, reason, date) {
+  penalties.push({ empId, empName, reason, date, month: monthKey(), amount: 50000 });
+  localStorage.setItem('penalties', JSON.stringify(penalties));
+  syncPenaltiesToSalary();
+}
+
+function addPenalty() {
+  const empId = document.getElementById('penaltyEmpSel').value;
+  const reason = document.getElementById('penaltyReason').value;
+  const emp = employees.find(e => e.id === empId);
+  if (!empId) return;
+  addPenaltyRecord(empId, emp?.name || empId, reason, today());
+  renderPenaltyList();
+  syncPenaltiesToSalary();
+  showToast('⚠️ Đã thêm phạt!', 'warning');
+}
+
+function removePenalty(idx) {
+  if (!confirm('Bỏ qua vi phạm này?')) return;
+  penalties.splice(idx, 1);
+  localStorage.setItem('penalties', JSON.stringify(penalties));
+  renderPenaltyList();
+  syncPenaltiesToSalary();
+  showToast('✅ Đã bỏ vi phạm', 'success');
+}
+
+function syncPenaltiesToSalary() {
+  const month = monthKey();
+  employees.forEach(emp => {
+    if (!salaryData[emp.id]) salaryData[emp.id] = {};
+    salaryData[emp.id].deductions = penalties
+      .filter(p => p.empId === emp.id && p.month === month)
+      .map(p => ({ reason: p.reason, amount: p.amount, date: p.date }));
+  });
+  renderSalaryTab();
+  apiCall('savePenalties', { month, penalties: penalties.filter(p => p.month === month) });
+}
+
+function switchPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  if (btn) btn.classList.add('active');
+  else {
+    const idx = { overview:0, employees:1, overtime:2, salary:3, schedule:4, settings:5 };
+    document.querySelectorAll('.nav-item')[idx[name]??0].classList.add('active');
+  }
+  if (name === 'salary') renderSalaryTab();
+  if (name === 'schedule') renderScheduleTab();
+}
+
+function showToast(msg, type='success') {
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+    background:${type==='success'?'#22c55e':type==='danger'?'#ef4444':'#f59e0b'};
+    color:white;padding:12px 20px;border-radius:12px;font-size:0.85rem;font-weight:600;
+    z-index:500;max-width:90vw;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.2);`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+document.getElementById('empDetailModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEmpDetail();
+});
+document.getElementById('addEmpModal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.add('hidden');
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+init();
+</script>
+</body>
+</html>

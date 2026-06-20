@@ -1,0 +1,743 @@
+// ═══════════════════════════════════════════════════════════════════
+// GOOGLE APPS SCRIPT — HR System Backend
+// Paste toàn bộ file này vào Google Apps Script, sau đó Deploy
+// ═══════════════════════════════════════════════════════════════════
+// HƯỚNG DẪN:
+// 1. Mở Google Sheets mới → Extensions → Apps Script
+// 2. Xoá code mặc định, paste toàn bộ code này vào
+// 3. Deploy → New Deployment → Web App
+//    - Execute as: Me
+//    - Who has access: Anyone
+// 4. Copy URL → dán vào app Boss (tab Cài Đặt)
+// ═══════════════════════════════════════════════════════════════════
+
+const SHEET_ID = SpreadsheetApp.getActiveSpreadsheet().getId();
+const SS = SpreadsheetApp.getActiveSpreadsheet();
+
+// Tên các sheet (tab)
+const SHEETS = {
+  EMPLOYEES: 'Employees',
+  CHECKIN:   'Checkin',
+  CHECKLIST: 'Checklist',
+  SUPPLY:    'Supply',
+  OVERTIME:  'Overtime',
+  RETURNS:   'Returns',
+  DEDUCTIONS:'Deductions',
+  SALARY:    'Salary',
+  PINGS:     'Pings',
+  LOGS:      'Logs',
+  SCHEDULE:  'Schedule',
+};
+
+// ─── ENTRY POINT (GET — tránh CORS) ──────────────────────────────
+function doGet(e) {
+  try {
+    // Ping test không có payload
+    if (!e.parameter.payload) {
+      return output({ ok: true, msg: 'HR System API running' });
+    }
+
+    const data = JSON.parse(e.parameter.payload);
+    const action = data.action;
+    let result;
+
+    switch (action) {
+      case 'login':               result = handleLogin(data); break;
+      case 'getEmployees':        result = getEmployees(); break;
+      case 'addEmployee':         result = addEmployee(data); break;
+      case 'checkin':             result = handleCheckin(data); break;
+      case 'checkout':            result = handleCheckout(data); break;
+      case 'updateChecklist':     result = updateChecklist(data); break;
+      case 'getTodayData':        result = getTodayData(data); break;
+      case 'getTodayReports':     result = getTodayReports(data); break;
+      case 'submitSupply':        result = submitSupply(data); break;
+      case 'submitReturn':        result = submitReturn(data); break;
+      case 'startShift':          result = startShift(data); break;
+      case 'endShift':            result = endShift(data); break;
+      case 'registerOvertime':    result = registerOvertime(data); break;
+      case 'approveOT':           result = approveOT(data); break;
+      case 'rejectOT':            result = rejectOT(data); break;
+      case 'getOvertimeList':     result = getOvertimeList(data); break;
+      case 'getOvertimeRequests': result = getOvertimeRequests(data); break;
+      case 'submitShiftResult':   result = submitShiftResult(data); break;
+      case 'pingOk':              result = handlePing(data, true); break;
+      case 'pingMiss':            result = handlePing(data, false); break;
+      case 'addDeduction':        result = addDeduction(data); break;
+      case 'getSalaryData':       result = getSalaryData(data); break;
+      case 'saveSalesBonus':      result = saveSalesBonus(data); break;
+      case 'confirmSalary':       result = confirmSalary(data); break;
+      case 'getOTSummary':        result = getOTSummary(data); break;
+      case 'getSalesBonus':       result = getSalesBonus(data); break;
+      case 'approveDay':          result = approveDay(data); break;
+      case 'registerSchedule':    result = registerSchedule(data); break;
+      case 'getSchedule':         result = getSchedule(data); break;
+      case 'getWeeklySchedule':   result = getWeeklySchedule(data); break;
+      case 'approveShiftHours':   result = approveShiftHours(data); break;
+      case 'startOTShift':        result = startOTShift(data); break;
+      case 'endOTShift':          result = endOTShift(data); break;
+      case 'editSchedule':        result = editSchedule(data); break;
+      case 'savePenalties':       result = savePenalties(data); break;
+      case 'getPenalties':        result = getPenalties(data); break;
+      default: result = { ok: false, error: 'Unknown action: ' + action };
+    }
+
+    return output(result);
+
+  } catch(err) {
+    log('ERROR', err.toString());
+    return output({ ok: false, error: err.toString() });
+  }
+}
+
+function output(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Giữ doPost để tương thích
+function doPost(e) { return doGet(e); }
+
+// ─── SHEET HELPERS ────────────────────────────────────────────────
+function getSheet(name) {
+  let sheet = SS.getSheetByName(name);
+  if (!sheet) {
+    sheet = SS.insertSheet(name);
+    initSheet(sheet, name);
+  }
+  return sheet;
+}
+
+function initSheet(sheet, name) {
+  const headers = {
+    [SHEETS.EMPLOYEES]:  ['id','name','phone','salary','color','created','passHash'],
+    [SHEETS.CHECKIN]:    ['empId','date','checkinTime','checkoutTime','lat','lng','late','lateMin','approved'],
+    [SHEETS.CHECKLIST]:  ['empId','date','taskId','done','doneTime'],
+    [SHEETS.SUPPLY]:     ['empId','date','time','carton_nap_gap_35x25x7','carton_nap_gap_20x15x6','carton_doi_khau_40x30x20','carton_doi_khau_35x25x15','carton_doi_khau_12x12x12','hop_dong_ho','hop_vong_tay','bang_dinh','xop_60cm','xop_40cm','giay_in_don','decan_noi','decan_vanh','decan_vua','giay_nen_vua','hasAlert'],
+    [SHEETS.SCHEDULE]:   ['empId','weekStart','day','date','shift','eveningStart','eveningEnd','plannedHours','actualHours','status'],
+    [SHEETS.OVERTIME]:   ['id','empId','date','start','end','hours','plan','status','approvedBy','approvedAt','resultDesc'],
+    [SHEETS.RETURNS]:    ['empId','date','time','orderId','product','qty','condition','photo'],
+    [SHEETS.DEDUCTIONS]: ['empId','month','date','reason','amount'],
+    [SHEETS.SALARY]:     ['empId','month','salesBonus','confirmed','confirmedAt'],
+    [SHEETS.PINGS]:      ['empId','date','time','responded'],
+    [SHEETS.LOGS]:       ['ts','action','detail'],
+  };
+  if (headers[name]) sheet.getRange(1, 1, 1, headers[name].length).setValues([headers[name]]);
+}
+
+function sheetData(name) {
+  const sheet = getSheet(name);
+  const vals = sheet.getDataRange().getValues();
+  if (vals.length < 2) return [];
+  const headers = vals[0];
+  return vals.slice(1).map(row => {
+    const obj = {};
+    headers.forEach((h, i) => obj[h] = row[i]);
+    return obj;
+  });
+}
+
+function appendRow(name, obj) {
+  const sheet = getSheet(name);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  sheet.appendRow(headers.map(h => obj[h] !== undefined ? obj[h] : ''));
+}
+
+function updateRow(name, matchField, matchVal, updates) {
+  const sheet = getSheet(name);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const col = headers.indexOf(matchField);
+  if (col < 0) return false;
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][col]) === String(matchVal)) {
+      Object.entries(updates).forEach(([k, v]) => {
+        const c = headers.indexOf(k);
+        if (c >= 0) sheet.getRange(i+1, c+1).setValue(v);
+      });
+      return true;
+    }
+  }
+  return false;
+}
+
+function hashPass(pass) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, pass)
+    .map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
+}
+
+function uid() { return Utilities.getUuid().slice(0, 8); }
+function log(action, detail) {
+  try { appendRow(SHEETS.LOGS, { ts: new Date().toISOString(), action, detail: String(detail).slice(0, 500) }); } catch(e) {}
+}
+
+// ─── AUTH ─────────────────────────────────────────────────────────
+function handleLogin(data) {
+  const { code, pass } = data;
+  const employees = sheetData(SHEETS.EMPLOYEES);
+  const emp = employees.find(e => e.id === code);
+  if (!emp) return { ok: false, error: 'Không tìm thấy nhân viên' };
+  if (emp.passHash !== hashPass(pass)) return { ok: false, error: 'Sai mật khẩu' };
+  return { ok: true, user: { id: emp.id, name: emp.name, phone: emp.phone, color: emp.color } };
+}
+
+// ─── EMPLOYEES ────────────────────────────────────────────────────
+function getEmployees() {
+  const data = sheetData(SHEETS.EMPLOYEES).map(e => ({
+    id: e.id, name: e.name, phone: e.phone, salary: Number(e.salary)||0, color: e.color, created: e.created
+  }));
+  return { ok: true, data };
+}
+
+function addEmployee(data) {
+  const { emp, pass } = data;
+  const existing = sheetData(SHEETS.EMPLOYEES);
+  if (existing.find(e => e.id === emp.id)) return { ok: false, error: 'Mã NV đã tồn tại' };
+  appendRow(SHEETS.EMPLOYEES, { ...emp, passHash: hashPass(pass) });
+  return { ok: true };
+}
+
+// ─── CHECKIN ──────────────────────────────────────────────────────
+function handleCheckin(data) {
+  const { empId, date, time, late, lateMin } = data;
+  // Xoá nếu đã tồn tại hôm nay
+  const sheet = getSheet(SHEETS.CHECKIN);
+  const vals = sheet.getDataRange().getValues();
+  for (let i = vals.length - 1; i >= 1; i--) {
+    if (vals[i][0] === empId && vals[i][1] === date) {
+      // Đã check-in rồi, không ghi đè
+      return { ok: false, error: 'Đã check-in rồi' };
+    }
+  }
+  appendRow(SHEETS.CHECKIN, { empId, date, checkinTime: time, late: late?'TRUE':'FALSE', lateMin: lateMin||0 });
+  log('checkin', `${empId} - ${date} ${time}${late?' TRỄ '+lateMin+'p':''}`);
+  if (late) addAutoPenalty(empId, date, 'late', `Đi muộn ${lateMin} phút`);
+  return { ok: true };
+}
+
+function handleCheckout(data) {
+  const { empId, date, time, early, earlyMin } = data;
+  updateRow(SHEETS.CHECKIN, 'empId', empId, { checkoutTime: time, early: early?'TRUE':'FALSE', earlyMin: earlyMin||0 });
+  log('checkout', `${empId} - ${date} ${time}${early?' VỀ SỚM '+earlyMin+'p':''}`);
+  if (early) addAutoPenalty(empId, date, 'early', `Về sớm ${earlyMin} phút`);
+  return { ok: true };
+}
+
+function addAutoPenalty(empId, date, reason, note) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Penalties');
+  if (!sheet) {
+    sheet = ss.insertSheet('Penalties');
+    sheet.appendRow(['month','empId','empName','reason','date','amount','note','auto']);
+  }
+  const month = date.slice(0, 7); // YYYY-MM
+  // Không thêm trùng (cùng empId + date + reason)
+  const vals = sheet.getDataRange().getValues();
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][1]) === String(empId) && String(vals[i][4]) === String(date) && String(vals[i][3]) === String(reason)) return;
+  }
+  // Lấy tên nhân viên
+  const empSheet = getSheet(SHEETS.EMPLOYEES);
+  const empVals = empSheet.getDataRange().getValues();
+  const empHeaders = empVals[0];
+  const nameCol = empHeaders.indexOf('name');
+  const idCol = empHeaders.indexOf('id');
+  let empName = empId;
+  for (let i = 1; i < empVals.length; i++) {
+    if (String(empVals[i][idCol]) === String(empId)) { empName = empVals[i][nameCol]; break; }
+  }
+  sheet.appendRow([month, empId, empName, reason, date, 50000, note, 'auto']);
+}
+
+// ─── CHECKLIST ────────────────────────────────────────────────────
+function updateChecklist(data) {
+  const { empId, date, taskId, done, doneTime } = data;
+  const sheet = getSheet(SHEETS.CHECKLIST);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const empCol = headers.indexOf('empId');
+  const dateCol = headers.indexOf('date');
+  const taskCol = headers.indexOf('taskId');
+  const doneCol = headers.indexOf('done');
+  const timeCol = headers.indexOf('doneTime');
+
+  for (let i = 1; i < vals.length; i++) {
+    if (vals[i][empCol]===empId && vals[i][dateCol]===date && vals[i][taskCol]===taskId) {
+      sheet.getRange(i+1, doneCol+1).setValue(done?'TRUE':'FALSE');
+      if (doneTime) sheet.getRange(i+1, timeCol+1).setValue(doneTime);
+      return { ok: true };
+    }
+  }
+  appendRow(SHEETS.CHECKLIST, { empId, date, taskId, done: done?'TRUE':'FALSE', doneTime: doneTime||'' });
+  return { ok: true };
+}
+
+// ─── TODAY DATA ───────────────────────────────────────────────────
+function getTodayData(data) {
+  const { empId, date } = data;
+  const checkins = sheetData(SHEETS.CHECKIN).filter(r => r.empId===empId && r.date===date);
+  const checklists = sheetData(SHEETS.CHECKLIST).filter(r => r.empId===empId && r.date===date);
+  const supplies = sheetData(SHEETS.SUPPLY).filter(r => r.empId===empId && r.date===date);
+
+  const checklist = {};
+  checklists.forEach(r => { checklist[r.taskId] = r.done === 'TRUE'; });
+
+  const ci = checkins[0] || {};
+  const sup = supplies[0] || null;
+
+  return {
+    ok: true,
+    data: {
+      checkin: ci.checkinTime || null,
+      checkout: ci.checkoutTime || null,
+      late: ci.late === 'TRUE',
+      lateMin: Number(ci.lateMin) || 0,
+      checklist,
+      supply: sup ? {
+        data: {
+          carton_30x20x10: sup.carton_30x20x10,
+          carton_25x20x10: sup.carton_25x20x10,
+          carton_15x10x10: sup.carton_15x10x10,
+          tape: sup.tape, bubble_wrap: sup.bubble_wrap, print_paper: sup.print_paper
+        },
+        hasAlert: sup.hasAlert === 'TRUE'
+      } : null
+    }
+  };
+}
+
+function getTodayReports(data) {
+  const { date } = data;
+  const employees = sheetData(SHEETS.EMPLOYEES);
+  const checkins = sheetData(SHEETS.CHECKIN).filter(r => r.date === date);
+  const checklists = sheetData(SHEETS.CHECKLIST).filter(r => r.date === date);
+  const supplies = sheetData(SHEETS.SUPPLY).filter(r => r.date === date);
+  const pings = sheetData(SHEETS.PINGS).filter(r => r.date === date && r.responded === 'FALSE');
+  const overtime = sheetData(SHEETS.OVERTIME).filter(r => r.date === date && r.status === 'active');
+
+  const reports = {};
+  employees.forEach(emp => {
+    const ci = checkins.find(r => r.empId === emp.id) || {};
+    const cl = {};
+    checklists.filter(r => r.empId === emp.id).forEach(r => { cl[r.taskId] = r.done === 'TRUE'; });
+    const sup = supplies.find(r => r.empId === emp.id);
+    const missedPing = pings.some(r => r.empId === emp.id);
+    const activeShift = overtime.some(r => r.empId === emp.id);
+
+    reports[emp.id] = {
+      checkin: ci.checkinTime || null,
+      checkout: ci.checkoutTime || null,
+      late: ci.late === 'TRUE',
+      lateMin: Number(ci.lateMin) || 0,
+      checklist: cl,
+      supply: sup ? { data: sup, hasAlert: sup.hasAlert === 'TRUE' } : null,
+      pingMiss: missedPing,
+      activeShift,
+    };
+  });
+  return { ok: true, data: reports };
+}
+
+// ─── SUPPLY ───────────────────────────────────────────────────────
+function submitSupply(data) {
+  const { empId, date, data: supplyData, hasAlert } = data;
+  appendRow(SHEETS.SUPPLY, {
+    empId, date, time: new Date().toTimeString().slice(0,5),
+    carton_30x20x10: supplyData.carton_30x20x10 ?? '',
+    carton_25x20x10: supplyData.carton_25x20x10 ?? '',
+    carton_15x10x10: supplyData.carton_15x10x10 ?? '',
+    tape: supplyData.tape ?? '',
+    bubble_wrap: supplyData.bubble_wrap ?? '',
+    print_paper: supplyData.print_paper ?? '',
+    hasAlert: hasAlert ? 'TRUE' : 'FALSE',
+  });
+  if (hasAlert) {
+    log('SUPPLY_ALERT', `${empId} báo kho thấp - ${date}`);
+  }
+  return { ok: true };
+}
+
+function submitReturn(data) {
+  const { empId, date, orderId, product, qty, condition } = data;
+  appendRow(SHEETS.RETURNS, {
+    empId, date, time: new Date().toTimeString().slice(0,5),
+    orderId, product, qty, condition
+  });
+  log('return', `${empId} - ${orderId} - ${product} x${qty} - ${condition}`);
+  return { ok: true };
+}
+
+// ─── OVERTIME / SHIFTS ────────────────────────────────────────────
+function registerOvertime(data) {
+  const { empId, date, start, end, plan } = data;
+  const id = uid();
+  appendRow(SHEETS.OVERTIME, { id, empId, date, start, end, plan, status: 'pending' });
+  return { ok: true, id };
+}
+
+function startShift(data) {
+  const { empId, date, startTime } = data;
+  // Cập nhật hoặc tạo record
+  const found = updateRow(SHEETS.OVERTIME, 'empId', empId, { status: 'active', start: startTime });
+  if (!found) {
+    appendRow(SHEETS.OVERTIME, { id: uid(), empId, date, start: startTime, status: 'active' });
+  }
+  return { ok: true };
+}
+
+function endShift(data) {
+  const { empId, date, endTime, hours } = data;
+  updateRow(SHEETS.OVERTIME, 'empId', empId, { status: 'done', end: endTime, hours });
+  return { ok: true };
+}
+
+function approveOT(data) {
+  updateRow(SHEETS.OVERTIME, 'id', data.id, { status: 'approved', approvedAt: new Date().toISOString() });
+  return { ok: true };
+}
+
+function rejectOT(data) {
+  updateRow(SHEETS.OVERTIME, 'id', data.id, { status: 'rejected' });
+  return { ok: true };
+}
+
+function getOvertimeList(data) {
+  const { empId, month } = data;
+  const rows = sheetData(SHEETS.OVERTIME).filter(r =>
+    r.empId === empId && r.date && r.date.startsWith(month)
+  ).map(r => ({
+    id: r.id, date: r.date, start: r.start, end: r.end,
+    hours: r.hours, plan: r.plan,
+    approved: r.status === 'approved' || r.status === 'done',
+    rejected: r.status === 'rejected',
+  }));
+  return { ok: true, data: rows };
+}
+
+function getOvertimeRequests(data) {
+  const { month } = data;
+  const rows = sheetData(SHEETS.OVERTIME).filter(r =>
+    r.date && r.date.startsWith(month)
+  ).map(r => ({
+    id: r.id, empId: r.empId, date: r.date, start: r.start, end: r.end,
+    hours: r.hours, plan: r.plan, status: r.status,
+    approved: r.status === 'approved' || r.status === 'done',
+    rejected: r.status === 'rejected',
+  }));
+  return { ok: true, data: rows };
+}
+
+function getOTSummary(data) {
+  const { empId, month } = data;
+  const rows = sheetData(SHEETS.OVERTIME).filter(r =>
+    r.empId === empId && r.date && r.date.startsWith(month) &&
+    (r.status === 'done' || r.status === 'approved')
+  );
+  const hours = rows.reduce((s, r) => s + (Number(r.hours) || 0), 0);
+  return { ok: true, data: { hours: Math.round(hours * 10) / 10 } };
+}
+
+function submitShiftResult(data) {
+  const { empId, date, desc } = data;
+  updateRow(SHEETS.OVERTIME, 'empId', empId, { resultDesc: desc });
+  return { ok: true };
+}
+
+// ─── PINGS ────────────────────────────────────────────────────────
+function handlePing(data, responded) {
+  const { empId, date, time } = data;
+  appendRow(SHEETS.PINGS, { empId, date, time, responded: responded ? 'TRUE' : 'FALSE' });
+  if (!responded) log('PING_MISS', `${empId} không phản hồi ping lúc ${time}`);
+  return { ok: true };
+}
+
+// ─── DEDUCTIONS ───────────────────────────────────────────────────
+function addDeduction(data) {
+  const { empId, month, date, reason, amount } = data;
+  appendRow(SHEETS.DEDUCTIONS, { empId, month, date, reason, amount });
+  return { ok: true };
+}
+
+// ─── SALARY ───────────────────────────────────────────────────────
+function getSalaryData(data) {
+  const { month } = data;
+  const employees = sheetData(SHEETS.EMPLOYEES);
+  const deductions = sheetData(SHEETS.DEDUCTIONS).filter(r => r.month === month);
+  const salaries = sheetData(SHEETS.SALARY).filter(r => r.month === month);
+  const overtime = sheetData(SHEETS.OVERTIME).filter(r =>
+    r.date && r.date.startsWith(month) && (r.status === 'done' || r.status === 'approved')
+  );
+  const checkins = sheetData(SHEETS.CHECKIN).filter(r => r.date && r.date.startsWith(month));
+  // Lấy ca ngoài giờ từ Schedule (hasOT = TRUE, date trong tháng)
+  const scheduleOT = sheetData(SHEETS.SCHEDULE).filter(r =>
+    r.date && r.date.startsWith(month) && String(r.hasOT) === 'true'
+  );
+
+  const result = {};
+  employees.forEach(emp => {
+    const empDeductions = deductions.filter(d => d.empId === emp.id);
+    const empSalary = salaries.find(s => s.empId === emp.id);
+    const empOT = overtime.filter(o => o.empId === emp.id);
+    const otHoursOld = empOT.reduce((s, o) => s + (Number(o.hours)||0), 0);
+    // Giờ ngoài giờ từ Schedule: ưu tiên actualHours, fallback plannedHours
+    const empSchedOT = scheduleOT.filter(r => String(r.empId) === String(emp.id));
+    const otHoursNew = empSchedOT.reduce((s, r) => {
+      const h = Number(r.actualHours) || Number(r.plannedHours) || 0;
+      // Ngày lễ nhân đôi (kiểm tra đơn giản các ngày cố định)
+      const mmdd = String(r.date).slice(5);
+      const isHoliday = ['01-01','04-30','05-01','09-02'].includes(mmdd) ||
+        ['2026-02-15','2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20','2026-04-27'].includes(r.date);
+      return s + (isHoliday ? h * 2 : h);
+    }, 0);
+    const otHours = otHoursOld + otHoursNew;
+
+    // Thưởng chuyên cần: trừ nếu có đi muộn
+    const lateDays = checkins.filter(c => c.empId === emp.id && c.late === 'TRUE').length;
+    const absentDays = 0; // TODO: tính ngày vắng
+    const attendanceBonus = lateDays > 0 ? Math.max(0, 300000 - lateDays * 30000) : 300000;
+
+    // Thưởng nhiệm vụ: trừ theo deductions liên quan checklist
+    const taskDeductions = empDeductions.filter(d => d.reason.includes('checklist')||d.reason.includes('nhiệm vụ'));
+    const taskBonus = Math.max(0, 500000 - taskDeductions.reduce((s,d)=>s+Number(d.amount),0));
+
+    result[emp.id] = {
+      baseSalary: Number(emp.salary) || 0,
+      otHours: Math.round(otHours * 10) / 10,
+      attendanceBonus,
+      tasksBonus: taskBonus,
+      salesBonus: Number(empSalary?.salesBonus) || 0,
+      deductions: empDeductions,
+      confirmed: empSalary?.confirmed === 'TRUE',
+    };
+  });
+  return { ok: true, data: result };
+}
+
+function saveSalesBonus(data) {
+  const { month, bonuses } = data;
+  Object.entries(bonuses).forEach(([empId, amount]) => {
+    const found = updateRow(SHEETS.SALARY, 'empId', empId, { salesBonus: amount });
+    if (!found) appendRow(SHEETS.SALARY, { empId, month, salesBonus: amount, confirmed: 'FALSE' });
+  });
+  return { ok: true };
+}
+
+function getSalesBonus(data) {
+  const { empId, month } = data;
+  const row = sheetData(SHEETS.SALARY).find(r => r.empId === empId && r.month === month);
+  return { ok: true, data: { amount: Number(row?.salesBonus) || 0 } };
+}
+
+function confirmSalary(data) {
+  const { month } = data;
+  const employees = sheetData(SHEETS.EMPLOYEES);
+  employees.forEach(emp => {
+    const found = updateRow(SHEETS.SALARY, 'empId', emp.id, {
+      confirmed: 'TRUE', confirmedAt: new Date().toISOString()
+    });
+    if (!found) appendRow(SHEETS.SALARY, {
+      empId: emp.id, month, salesBonus: 0, confirmed: 'TRUE', confirmedAt: new Date().toISOString()
+    });
+  });
+  log('SALARY_CONFIRMED', `Tháng ${month} đã chốt lương`);
+  return { ok: true };
+}
+
+function approveDay(data) {
+  const { empId, date } = data;
+  updateRow(SHEETS.CHECKIN, 'empId', empId, { approved: 'TRUE' });
+  log('APPROVE_DAY', `Boss xác nhận ngày làm ${empId} - ${date}`);
+  return { ok: true };
+}
+
+// ─── SCHEDULE ─────────────────────────────────────────────────────
+function registerSchedule(data) {
+  const { empId, weekStart, schedule } = data;
+  const dayKeys = ['mon','tue','wed','thu','fri','sat','sun'];
+  // Xoá lịch cũ của tuần này nếu có
+  const sheet = getSheet(SHEETS.SCHEDULE);
+  const vals = sheet.getDataRange().getValues();
+  for (let i = vals.length - 1; i >= 1; i--) {
+    if (String(vals[i][0]) === String(empId) && String(vals[i][1]) === String(weekStart)) {
+      sheet.deleteRow(i + 1);
+    }
+  }
+  // Ghi lịch mới
+  dayKeys.forEach(day => {
+    const s = schedule[day];
+    if (!s) return;
+    appendRow(SHEETS.SCHEDULE, {
+      empId, weekStart, day, date: s.date, shift: s.shift,
+      eveningStart: s.eveningStart || '', eveningEnd: s.eveningEnd || '',
+      plannedHours: s.plannedHours || 0, actualHours: '', status: 'pending'
+    });
+  });
+  log('SCHEDULE', `${empId} đăng ký lịch tuần ${weekStart}`);
+  return { ok: true };
+}
+
+function getSchedule(data) {
+  const { empId, weekStart } = data;
+  const rows = sheetData(SHEETS.SCHEDULE).filter(r => r.empId === empId && r.weekStart === weekStart);
+  const result = {};
+  rows.forEach(r => { result[r.day] = r; });
+  return { ok: true, data: result };
+}
+
+function getWeeklySchedule(data) {
+  const { weekStart } = data;
+  const rows = sheetData(SHEETS.SCHEDULE).filter(r => r.weekStart === weekStart);
+  const result = {};
+  rows.forEach(r => {
+    if (!result[r.empId]) result[r.empId] = {};
+    result[r.empId][r.day] = r;
+  });
+  return { ok: true, data: result };
+}
+
+function startOTShift(data) {
+  const { empId, date, startTime } = data;
+  const sheet = getSheet(SHEETS.SCHEDULE);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const d = new Date(date);
+  const day = d.getDay();
+  const dayKey = ['sun','mon','tue','wed','thu','fri','sat'][day];
+  // Tính weekStart (thứ 2 của tuần đó)
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  const weekStart = mon.toISOString().slice(0,10);
+
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]) === String(empId) &&
+        String(vals[i][1]) === String(weekStart) &&
+        String(vals[i][2]) === String(dayKey)) {
+      const sIdx = headers.indexOf('status');
+      const stIdx = headers.indexOf('eveningStart');
+      if (sIdx >= 0) sheet.getRange(i+1, sIdx+1).setValue('started');
+      if (stIdx >= 0) sheet.getRange(i+1, stIdx+1).setValue(startTime);
+      break;
+    }
+  }
+  log('OT_START', `${empId} bắt đầu ca ngoài giờ ${date} lúc ${startTime}`);
+  return { ok: true };
+}
+
+function endOTShift(data) {
+  const { empId, date, endTime, hours } = data;
+  const sheet = getSheet(SHEETS.SCHEDULE);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const d = new Date(date);
+  const day = d.getDay();
+  const dayKey = ['sun','mon','tue','wed','thu','fri','sat'][day];
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  const weekStart = mon.toISOString().slice(0,10);
+
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]) === String(empId) &&
+        String(vals[i][1]) === String(weekStart) &&
+        String(vals[i][2]) === String(dayKey)) {
+      const sIdx = headers.indexOf('status');
+      const eIdx = headers.indexOf('eveningEnd');
+      const hIdx = headers.indexOf('actualHours');
+      if (sIdx >= 0) sheet.getRange(i+1, sIdx+1).setValue('done');
+      if (eIdx >= 0) sheet.getRange(i+1, eIdx+1).setValue(endTime);
+      if (hIdx >= 0) sheet.getRange(i+1, hIdx+1).setValue(hours);
+      break;
+    }
+  }
+  log('OT_END', `${empId} kết thúc ca ngoài giờ ${date} lúc ${endTime} — ${hours}h`);
+  return { ok: true };
+}
+
+function editSchedule(data) {
+  const { empId, weekStart, dayKey, date, shift, hasOT, eveningStart, eveningEnd, plannedHours } = data;
+  const sheet = getSheet(SHEETS.SCHEDULE);
+  const vals = sheet.getDataRange().getValues();
+  let found = false;
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]) === String(empId) &&
+        String(vals[i][1]) === String(weekStart) &&
+        String(vals[i][2]) === String(dayKey)) {
+      sheet.getRange(i+1, 1, 1, 10).setValues([[
+        empId, weekStart, dayKey, date, shift,
+        hasOT ? (eveningStart||'') : '',
+        hasOT ? (eveningEnd||'') : '',
+        hasOT ? (plannedHours||0) : 0,
+        '', 'boss_edited'
+      ]]);
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    sheet.appendRow([empId, weekStart, dayKey, date, shift,
+      hasOT ? (eveningStart||'') : '',
+      hasOT ? (eveningEnd||'') : '',
+      hasOT ? (plannedHours||0) : 0,
+      '', 'boss_edited']);
+  }
+  log('EDIT_SCHEDULE', `Boss sửa lịch ${empId} ${dayKey} ${weekStart}: ${shift}`);
+  return { ok: true };
+}
+
+function getPenalties(data) {
+  const { month } = data;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Penalties');
+  if (!sheet) return { ok: true, data: [] };
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const result = [];
+  for (let i = 1; i < vals.length; i++) {
+    const row = {};
+    headers.forEach((h, j) => row[h] = vals[i][j]);
+    if (String(row.month) === String(month)) result.push({
+      empId: row.empId, empName: row.empName, reason: row.reason,
+      date: row.date, amount: Number(row.amount)||50000,
+      note: row.note||'', auto: row.auto==='auto', month: row.month
+    });
+  }
+  return { ok: true, data: result };
+}
+
+function savePenalties(data) {
+  const { month, penalties } = data;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Penalties');
+  if (!sheet) {
+    sheet = ss.insertSheet('Penalties');
+    sheet.appendRow(['month','empId','empName','reason','date','amount']);
+  }
+  // Xoá dữ liệu tháng này rồi ghi lại
+  const vals = sheet.getDataRange().getValues();
+  for (let i = vals.length - 1; i >= 1; i--) {
+    if (String(vals[i][0]) === String(month)) sheet.deleteRow(i + 1);
+  }
+  penalties.forEach(p => {
+    sheet.appendRow([p.month, p.empId, p.empName, p.reason, p.date||'', p.amount||50000]);
+  });
+  return { ok: true };
+}
+
+function approveShiftHours(data) {
+  const { empId, weekStart, day, actualHours } = data;
+  const sheet = getSheet(SHEETS.SCHEDULE);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]) === String(empId) &&
+        String(vals[i][1]) === String(weekStart) &&
+        String(vals[i][2]) === String(day)) {
+      const hIdx = headers.indexOf('actualHours');
+      const sIdx = headers.indexOf('status');
+      if (hIdx >= 0) sheet.getRange(i+1, hIdx+1).setValue(actualHours);
+      if (sIdx >= 0) sheet.getRange(i+1, sIdx+1).setValue('approved');
+      break;
+    }
+  }
+  log('APPROVE_HOURS', `Boss xác nhận ${empId} ${day} ${weekStart}: ${actualHours}h`);
+  return { ok: true };
+}

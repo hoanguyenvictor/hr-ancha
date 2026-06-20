@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#667eea">
+<title>HR — Nhân Viên</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="app-header">
+  <div class="header-row">
+    <div>
+      <h1 id="headerName">Xin chào! 👋</h1>
+      <div class="sub" id="headerDate"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div id="headerAvatar" class="avatar" style="background:rgba(255,255,255,0.3)"></div>
+      <button onclick="logoutEmployee()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:8px;padding:6px 10px;font-size:0.75rem;cursor:pointer">Thoát</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAGES -->
+
+<!-- ── TRANG CHỦ ─────────────────────────────────── -->
+<div class="page active" id="page-home">
+
+  <!-- Check-in card -->
+  <div class="checkin-big" id="checkinCard">
+    <div class="checkin-time" id="liveClock">00:00</div>
+    <div class="checkin-date" id="liveDate"></div>
+    <div class="checkin-status" id="checkinStatus">Chưa check-in hôm nay</div>
+    <button class="btn" id="checkinBtn" style="background:white;color:var(--primary);font-weight:700" onclick="doCheckin()">
+      📍 Check-in Văn Phòng
+    </button>
+  </div>
+
+  <!-- Thống kê nhanh -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📊</span>Hôm Nay</div>
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="stat-num" id="statCheckin" style="color:var(--success)">—</div>
+        <div class="stat-label">Giờ vào</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statTaskDone" style="color:var(--primary)">0/0</div>
+        <div class="stat-label">Checklist xong</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statOvertime" style="color:var(--warning)">0h</div>
+        <div class="stat-label">Tăng ca tháng</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num" id="statBonus" style="color:var(--info)">—</div>
+        <div class="stat-label">Thưởng dự kiến</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cảnh báo -->
+  <div id="alertsBox"></div>
+
+  <!-- Checklist hôm nay -->
+  <div class="card">
+    <div class="card-title"><span class="icon">✅</span>Checklist Hôm Nay</div>
+    <div id="todayChecklist"></div>
+  </div>
+
+  <!-- Dụng cụ cần kiểm -->
+  <div class="card" id="supplyReminderCard" style="display:none">
+    <div class="card-title"><span class="icon">📦</span>Nhắc Kiểm Dụng Cụ</div>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:10px">Chưa kiểm dụng cụ hôm nay. Vào tab Kho để kiểm nhé!</p>
+    <button class="btn btn-outline btn-sm" onclick="switchPage('inventory')">Kiểm ngay →</button>
+  </div>
+
+</div>
+
+<!-- ── CHECKLIST ─────────────────────────────────── -->
+<div class="page" id="page-checklist">
+  <div class="card">
+    <div class="card-title"><span class="icon">🌅</span>Buổi Sáng</div>
+    <div id="morningList"></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="icon">🌆</span>Buổi Chiều</div>
+    <div id="afternoonList"></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="icon">📋</span>Nhiệm Vụ Phát Sinh</div>
+    <div id="adhocList">
+      <p style="font-size:0.85rem;color:var(--muted)">Chưa có nhiệm vụ phát sinh hôm nay</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── KHO DỤNG CỤ ───────────────────────────────── -->
+<div class="page" id="page-inventory">
+  <div class="card">
+    <div class="card-title"><span class="icon">📦</span>Kiểm Dụng Cụ Đóng Hàng</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:14px">Nhập số lượng thực tế đang có. Ô đỏ = dưới mức cảnh báo.</p>
+    <div id="supplyList"></div>
+    <button class="btn btn-primary" onclick="submitSupply()" style="margin-top:8px">💾 Lưu Báo Cáo Kho</button>
+  </div>
+
+  <!-- Loại hàng hoàn -->
+  <div class="card">
+    <div class="card-title"><span class="icon">🔄</span>Báo Hàng Hoàn Về</div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button id="btnReturnTypeCustomer" onclick="switchReturnType('customer')"
+        style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--primary);background:var(--primary);color:white;font-weight:700;font-size:0.82rem;cursor:pointer">
+        👤 Khách trả lại
+      </button>
+      <button id="btnReturnTypeCarrier" onclick="switchReturnType('carrier')"
+        style="flex:1;padding:10px;border-radius:10px;border:2px solid var(--muted);background:white;color:var(--muted);font-weight:700;font-size:0.82rem;cursor:pointer">
+        🚚 Vận chuyển hoàn
+      </button>
+    </div>
+
+    <!-- Form: Khách trả lại -->
+    <div id="returnFormCustomer">
+      <div class="form-group">
+        <label>Mã đơn hàng gốc</label>
+        <input type="text" id="r1_orderId" placeholder="VD: ORD123456">
+      </div>
+      <div class="form-group">
+        <label>Số tiền cần hoàn khách</label>
+        <input type="number" id="r1_amount" placeholder="VD: 250000">
+      </div>
+      <div class="form-group">
+        <label>Thông tin nhận CK của khách</label>
+        <textarea id="r1_bankInfo" rows="2" placeholder="Ngân hàng, số TK, tên chủ TK..."></textarea>
+        <div style="margin-top:6px">
+          <label style="font-size:0.78rem;color:var(--muted);display:block;margin-bottom:4px">📸 Ảnh mã QR của khách (nếu có)</label>
+          <div class="upload-area" onclick="document.getElementById('r1_qrPhoto').click()" id="r1_qrPreviewArea">
+            <div style="font-size:1.5rem">🔳</div>
+            <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">Chụp hoặc chọn ảnh mã QR</div>
+          </div>
+          <input type="file" id="r1_qrPhoto" accept="image/*" style="display:none" onchange="previewQRPhoto(this)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Tình trạng hàng nhận về</label>
+        <select id="r1_condition">
+          <option value="ok">Còn nguyên vẹn — bán lại được</option>
+          <option value="damaged">Hỏng / Không bán được nữa</option>
+          <option value="repack">Cần đóng gói lại</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>📷 Ảnh hàng khi shipper giao (ảnh từ shipper/app)</label>
+        <div class="upload-area" onclick="document.getElementById('r1_photoShipper').click()">
+          <div style="font-size:1.5rem">📋</div>
+          <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">Chụp màn hình hoặc ảnh shipper gửi</div>
+          <img id="r1_photoShipperPreview" class="upload-preview hidden">
+        </div>
+        <input type="file" id="r1_photoShipper" accept="image/*" class="hidden" onchange="previewPhoto(this,'r1_photoShipperPreview')">
+      </div>
+      <div class="form-group">
+        <label>📷 Ảnh hàng thực tế mình nhận được</label>
+        <div class="upload-area" onclick="document.getElementById('r1_photoActual').click()">
+          <div style="font-size:1.5rem">📷</div>
+          <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">Chụp thực tế hàng nhận về</div>
+          <img id="r1_photoActualPreview" class="upload-preview hidden">
+        </div>
+        <input type="file" id="r1_photoActual" accept="image/*" capture="environment" class="hidden" onchange="previewPhoto(this,'r1_photoActualPreview')">
+      </div>
+      <button class="btn btn-warning" onclick="submitReturnCustomer()">📥 Ghi Nhận — Khách Trả Lại</button>
+    </div>
+
+    <!-- Form: Vận chuyển hoàn -->
+    <div id="returnFormCarrier" style="display:none">
+      <div class="form-group">
+        <label>Số đơn hoàn hôm nay</label>
+        <input type="number" id="r2_count" placeholder="VD: 5" min="1">
+      </div>
+      <div class="form-group">
+        <label>Mã các đơn hoàn (mỗi mã 1 dòng)</label>
+        <textarea id="r2_orderIds" rows="4" placeholder="VD:&#10;VTP123456&#10;GHN789012&#10;..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>📷 Ảnh tổng số đơn vận chuyển hoàn về</label>
+        <div class="upload-area" onclick="document.getElementById('r2_photoOrders').click()">
+          <div style="font-size:1.5rem">📷</div>
+          <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">Chụp ảnh toàn bộ đơn hoàn</div>
+          <img id="r2_photoOrdersPreview" class="upload-preview hidden">
+        </div>
+        <input type="file" id="r2_photoOrders" accept="image/*" capture="environment" class="hidden" onchange="previewPhoto(this,'r2_photoOrdersPreview')">
+      </div>
+      <div class="form-group">
+        <label>📷 Ảnh đã kiểm kho trên Pancake</label>
+        <div class="upload-area" onclick="document.getElementById('r2_photoPancake').click()">
+          <div style="font-size:1.5rem">🥞</div>
+          <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">Chụp màn hình Pancake đã cập nhật</div>
+          <img id="r2_photoPancakePreview" class="upload-preview hidden">
+        </div>
+        <input type="file" id="r2_photoPancake" accept="image/*" class="hidden" onchange="previewPhoto(this,'r2_photoPancakePreview')">
+      </div>
+      <button class="btn btn-warning" onclick="submitReturnCarrier()">📥 Ghi Nhận — Vận Chuyển Hoàn</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── LỊCH LÀM VIỆC ──────────────────────────────── -->
+<div class="page" id="page-overtime">
+
+  <!-- Ca tối đang chạy -->
+  <div id="eveningShiftActive" class="hidden">
+    <div style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:white;border-radius:16px;padding:20px;margin-bottom:12px;text-align:center">
+      <div style="font-size:0.85rem;opacity:0.9;margin-bottom:4px">Ca tối đang chạy</div>
+      <div class="checkin-time" id="shiftElapsed">00:00:00</div>
+      <div style="font-size:0.82rem;opacity:0.85;margin-top:4px">Bắt đầu lúc <span id="shiftStartDisplay">—</span></div>
+      <button class="btn" style="background:white;color:var(--danger);margin-top:16px;font-weight:700" onclick="endEveningShift()">
+        ⏹ Kết Thúc Ca
+      </button>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">📤</span>Nộp Kết Quả Công Việc</div>
+      <div class="form-group">
+        <label>Mô tả công việc đã làm</label>
+        <textarea id="shiftWorkDesc" rows="3" placeholder="VD: Đã trả lời 45 tin nhắn khách, xử lý 12 đơn..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Ảnh kết quả</label>
+        <div class="upload-area" onclick="document.getElementById('shiftPhoto').click()">
+          <div style="font-size:1.5rem">📷</div>
+          <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">Chạm để chọn ảnh</div>
+          <img id="shiftPhotoPreview" class="upload-preview hidden">
+        </div>
+        <input type="file" id="shiftPhoto" accept="image/*" class="hidden" onchange="previewPhoto(this,'shiftPhotoPreview')">
+      </div>
+      <button class="btn btn-primary" onclick="submitShiftResult()">📤 Nộp Kết Quả</button>
+    </div>
+  </div>
+
+  <!-- Lịch làm -->
+  <div id="eveningShiftIdle">
+
+    <!-- Lịch tuần này -->
+    <div class="card">
+      <div class="card-title"><span class="icon">📅</span>Lịch Tuần Này</div>
+      <div id="weekScheduleView"><p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p></div>
+    </div>
+
+    <!-- Ca ngoài giờ hôm nay -->
+    <div class="card" id="otShiftCard" style="display:none">
+      <div class="card-title"><span class="icon">🌙</span>Ca Ngoài Giờ Hôm Nay</div>
+      <div id="otShiftInfo" style="font-size:0.85rem;color:var(--muted);margin-bottom:12px"></div>
+
+      <!-- Trạng thái: chưa bắt đầu -->
+      <div id="otIdle">
+        <button class="btn btn-success" onclick="startOTShift()" style="width:100%">🟢 Bắt Đầu Ca Ngoài Giờ</button>
+      </div>
+
+      <!-- Trạng thái: đang chạy -->
+      <div id="otRunning" class="hidden">
+        <div style="text-align:center;padding:12px 0">
+          <div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px">Đã làm được</div>
+          <div id="otElapsedDisplay" style="font-size:2rem;font-weight:800;color:var(--primary);font-variant-numeric:tabular-nums">00:00:00</div>
+          <div style="font-size:0.78rem;color:var(--muted);margin-top:4px">Bắt đầu lúc <span id="otStartDisplay">—</span></div>
+        </div>
+        <button class="btn btn-danger" onclick="endOTShift()" style="width:100%;margin-top:4px">🔴 Kết Thúc Ca</button>
+      </div>
+
+      <!-- Trạng thái: đã xong -->
+      <div id="otDone" class="hidden">
+        <div style="text-align:center;padding:8px 0;color:var(--success)">
+          <div style="font-size:1.5rem">✅</div>
+          <div style="font-weight:700;margin-top:4px" id="otDoneSummary">Ca hoàn thành</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Đăng ký lịch tuần sau (chỉ hiện Chủ Nhật) -->
+    <div class="card" id="scheduleRegCard">
+      <div class="card-title"><span class="icon">✏️</span>Đăng Ký Lịch Tuần Sau</div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Đăng ký trước mỗi Chủ Nhật. Nghỉ 1 ngày/tuần, chọn ca tối cần ghi rõ giờ.</p>
+      <div id="scheduleRegForm"></div>
+      <button class="btn btn-primary" onclick="submitSchedule()" style="margin-top:8px">📋 Gửi Lịch Cho Boss</button>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ── LƯƠNG & THƯỞNG ─────────────────────────────── -->
+<div class="page" id="page-salary">
+  <div class="card" style="background:linear-gradient(135deg,var(--primary),var(--secondary));color:white">
+    <div style="font-size:0.82rem;opacity:0.85;margin-bottom:4px">Thưởng dự kiến tháng này</div>
+    <div style="font-size:2rem;font-weight:800" id="totalBonusDisplay">—</div>
+    <div style="font-size:0.78rem;opacity:0.75;margin-top:4px">Cập nhật realtime theo tiến độ</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">🏆</span>Chi Tiết Thưởng</div>
+
+    <div class="bonus-bar">
+      <div class="bonus-label">
+        <span>Thưởng chuyên cần</span>
+        <span id="bonusAttendance">300,000đ</span>
+      </div>
+      <div class="bonus-track"><div class="bonus-fill" id="fillAttendance" style="background:var(--success);width:100%"></div></div>
+    </div>
+
+    <div class="bonus-bar">
+      <div class="bonus-label">
+        <span>Hoàn thành nhiệm vụ</span>
+        <span id="bonusTasks">500,000đ</span>
+      </div>
+      <div class="bonus-track"><div class="bonus-fill" id="fillTasks" style="background:var(--info);width:100%"></div></div>
+    </div>
+
+    <div class="bonus-bar">
+      <div class="bonus-label">
+        <span>Thưởng doanh số</span>
+        <span id="bonusSales">Chờ Boss nhập</span>
+      </div>
+      <div class="bonus-track"><div class="bonus-fill" id="fillSales" style="background:var(--warning);width:0%"></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">⚠️</span>Các Lần Bị Trừ</div>
+    <div id="deductionList"><p style="font-size:0.85rem;color:var(--muted)">Chưa có khoản trừ nào 🎉</p></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="icon">⏱</span>Tăng Ca Tháng Này</div>
+    <div id="overtimeSummary">
+      <div class="stat-grid" style="margin-bottom:10px">
+        <div class="stat-box">
+          <div class="stat-num" id="otHours" style="color:var(--warning)">0h</div>
+          <div class="stat-label">Tổng giờ</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-num" id="otPay" style="color:var(--success)">0đ</div>
+          <div class="stat-label">Tiền tăng ca</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="salarySlipCard" style="display:none">
+    <div class="card-title"><span class="icon">💰</span>Phiếu Lương Đã Xác Nhận</div>
+    <div id="salarySlipContent"></div>
+  </div>
+</div>
+
+<!-- ── BOTTOM NAV ─────────────────────────────────── -->
+<nav class="bottom-nav">
+  <button class="nav-item active" onclick="switchPage('home',this)">
+    <span class="icon">🏠</span><span>Trang Chủ</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('checklist',this)">
+    <span class="icon">✅</span><span>Checklist</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('inventory',this)">
+    <span class="icon">📦</span><span>Kho</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('overtime',this)">
+    <span class="icon">📅</span><span>Lịch</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('salary',this)">
+    <span class="icon">💰</span><span>Lương</span>
+  </button>
+</nav>
+
+<!-- PING MODAL -->
+<div class="ping-overlay hidden" id="pingOverlay">
+  <div class="ping-box">
+    <div class="ping-icon">🔔</div>
+    <div class="ping-title">XÁC NHẬN ĐANG LÀM VIỆC!</div>
+    <p style="font-size:0.85rem;color:var(--muted);margin-bottom:8px">Bấm xác nhận trong vòng:</p>
+    <div class="ping-countdown" id="pingCountdown">05:00</div>
+    <button class="btn btn-success" onclick="confirmPing()">✅ Em đang làm việc!</button>
+    <p style="font-size:0.72rem;color:var(--muted);margin-top:8px">Không phản hồi → ghi nhận vắng mặt</p>
+  </div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div class="modal-overlay" id="loginModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">👋 Đăng Nhập</div>
+    <div style="background:#f0f9ff;border-radius:12px;padding:14px;margin-bottom:16px;font-size:0.82rem;color:#0c4a6e">
+      📋 Tài khoản do Boss cấp. Liên hệ Boss nếu chưa có.
+    </div>
+    <div class="form-group">
+      <label>Mã nhân viên</label>
+      <input type="text" id="loginCode" placeholder="VD: NV001" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label>Mật khẩu</label>
+      <input type="password" id="loginPass" placeholder="••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" onclick="doLogin()">Đăng Nhập →</button>
+    <div id="loginError" style="color:var(--danger);font-size:0.82rem;margin-top:10px;text-align:center"></div>
+  </div>
+</div>
+
+<script src="db.js"></script>
+<script>
+// ─── CHECKLIST DATA ────────────────────────────────────
+const MORNING_TASKS = [
+  { id: 'm1', name: 'Dọn dẹp văn phòng', detail: 'Quét và lau sàn toàn bộ văn phòng' },
+  { id: 'm2', name: 'Lau bàn ghế', detail: 'Lau sạch tất cả bàn làm việc và ghế' },
+  { id: 'm3', name: 'Kiểm tra máy móc', detail: 'Máy in, máy tính, điều hoà hoạt động bình thường' },
+  { id: 'm4', name: 'Chuẩn bị dụng cụ đóng hàng', detail: 'Sắp xếp hộp, băng dính, chống sốc gọn gàng' },
+  { id: 'm5', name: 'Check đơn hàng cần xử lý', detail: 'Xem danh sách đơn cần đóng gói và giao hôm nay' },
+];
+const AFTERNOON_TASKS = [
+  { id: 'a1', name: 'Dọn dẹp cuối ngày', detail: 'Quét, lau sàn trước khi về' },
+  { id: 'a2', name: 'Xếp hàng hoá gọn gàng', detail: 'Hàng hoá đúng vị trí, có nhãn mác rõ ràng' },
+  { id: 'a3', name: 'Thu dọn dụng cụ đóng hàng', detail: 'Hộp, băng dính xếp vào đúng chỗ quy định' },
+  { id: 'a4', name: 'Tắt thiết bị điện', detail: 'Điều hoà, quạt, đèn (trừ camera)' },
+  { id: 'a5', name: 'Khoá cửa, kiểm tra an ninh', detail: 'Cửa chính, cửa kho đều khoá' },
+];
+const SUPPLY_ITEMS = [
+  { key: 'carton_nap_gap_35x25x7', name: 'Hộp carton nắp gập 35×25×7', unit: 'hộp', alert: 20 },
+  { key: 'carton_nap_gap_20x15x6', name: 'Hộp carton nắp gập 20×15×6', unit: 'hộp', alert: 20 },
+  { key: 'carton_doi_khau_40x30x20', name: 'Hộp carton đối khẩu 40×30×20', unit: 'hộp', alert: 20 },
+  { key: 'carton_doi_khau_35x25x15', name: 'Hộp carton đối khẩu 35×25×15', unit: 'hộp', alert: 20 },
+  { key: 'carton_doi_khau_12x12x12', name: 'Hộp carton đối khẩu 12×12×12', unit: 'hộp', alert: 20 },
+  { key: 'hop_dong_ho', name: 'Hộp đựng đồng hồ', unit: 'hộp', alert: 20 },
+  { key: 'hop_vong_tay', name: 'Hộp đựng vòng tay', unit: 'hộp', alert: 20 },
+  { key: 'bang_dinh', name: 'Băng dính', unit: 'cuộn', alert: 2 },
+  { key: 'xop_60cm', name: 'Xốp chống sốc 60cm', unit: 'cuộn', alert: 1 },
+  { key: 'xop_40cm', name: 'Xốp chống sốc 40cm', unit: 'cuộn', alert: 1 },
+  { key: 'giay_in_don', name: 'Giấy in đơn', unit: 'cuộn', alert: 2 },
+  { key: 'decan_noi', name: 'Decan Nói', unit: 'tệp', alert: 5 },
+  { key: 'decan_vanh', name: 'Decan Vành', unit: 'tệp', alert: 5 },
+  { key: 'decan_vua', name: 'Decan Vừa', unit: 'tệp', alert: 5 },
+  { key: 'giay_nen_vua', name: 'Giấy nến bọc hàng (Vừa)', unit: 'cái', alert: 20 },
+];
+
+// ─── STATE ─────────────────────────────────────────────
+let state = {
+  user: null,
+  todayData: null,
+  checklistState: {},  // { taskId: true/false }
+  shiftStart: null,
+  shiftTimer: null,
+  pingTimer: null,
+  pingCountdownTimer: null,
+};
+
+// ─── INIT ──────────────────────────────────────────────
+async function init() {
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  const user = getCurrentUser();
+  if (!user) {
+    document.getElementById('loginModal').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('loginModal').classList.add('hidden');
+  state.user = user;
+  setupHeader();
+  await loadTodayData();
+  renderHome();
+  renderChecklist();
+  renderSupply();
+  renderSalary();
+  loadOvertimeList();
+
+  // Check ca tối đang chạy
+  const shiftData = JSON.parse(localStorage.getItem('activeShift') || 'null');
+  if (shiftData) {
+    state.shiftStart = new Date(shiftData.start);
+    showActiveShift();
+    startShiftTimer();
+    schedulePing();
+  }
+
+  // Đặt ngày mặc định cho đăng ký OT
+  document.getElementById('otDate').value = today();
+}
+
+function setupHeader() {
+  const u = state.user;
+  document.getElementById('headerName').textContent = `Xin chào, ${u.name}! 👋`;
+  document.getElementById('headerDate').textContent = new Date().toLocaleDateString('vi-VN', { weekday:'long', day:'2-digit', month:'2-digit' });
+  const initials = u.name.split(' ').slice(-2).map(w=>w[0]).join('').toUpperCase();
+  const av = document.getElementById('headerAvatar');
+  av.textContent = initials;
+  av.style.background = u.color || 'rgba(255,255,255,0.3)';
+}
+
+function updateClock() {
+  const now = new Date();
+  document.getElementById('liveClock').textContent = now.toLocaleTimeString('vi-VN', { hour:'2-digit', minute:'2-digit' });
+  document.getElementById('liveDate').textContent = now.toLocaleDateString('vi-VN', { weekday:'long', day:'2-digit', month:'2-digit', year:'numeric' });
+}
+
+async function loadTodayData() {
+  // Load từ localStorage trước (offline), sau đó sync
+  const cached = JSON.parse(localStorage.getItem(`todayData_${today()}`) || 'null');
+  state.todayData = cached || { checkin: null, checkout: null, checklist: {}, supply: null };
+  state.checklistState = state.todayData.checklist || {};
+
+  try {
+    const res = await apiCall('getTodayData', { empId: state.user.id, date: today() });
+    if (res.ok && res.data) {
+      state.todayData = res.data;
+      state.checklistState = res.data.checklist || {};
+      localStorage.setItem(`todayData_${today()}`, JSON.stringify(res.data));
+    }
+  } catch(e) {}
+}
+
+// ─── HOME PAGE ─────────────────────────────────────────
+function renderHome() {
+  const d = state.todayData;
+
+  // Check-in status
+  if (d.checkin) {
+    document.getElementById('checkinStatus').textContent = `✅ Đã check-in lúc ${d.checkin}${d.late ? ' (trễ ' + d.lateMin + ' phút)' : ''}`;
+    document.getElementById('checkinBtn').textContent = d.checkout ? '✅ Đã check-out' : '🏁 Check-out';
+    document.getElementById('checkinBtn').onclick = d.checkout ? null : doCheckout;
+    document.getElementById('checkinBtn').disabled = !!d.checkout;
+    document.getElementById('statCheckin').textContent = d.checkin;
+  }
+
+  // Checklist progress
+  const allTasks = [...MORNING_TASKS, ...AFTERNOON_TASKS];
+  const done = allTasks.filter(t => state.checklistState[t.id]).length;
+  document.getElementById('statTaskDone').textContent = `${done}/${allTasks.length}`;
+
+  // Bonus
+  const bonus = calcBonus();
+  document.getElementById('statBonus').textContent = formatVND(bonus.total);
+
+  // Alerts
+  renderAlerts();
+
+  // Today checklist preview (3 pending items)
+  const pending = allTasks.filter(t => !state.checklistState[t.id]).slice(0, 3);
+  const cl = document.getElementById('todayChecklist');
+  if (pending.length === 0) {
+    cl.innerHTML = `<div style="text-align:center;padding:12px;color:var(--success);font-weight:700">🎉 Hoàn thành hết checklist!</div>`;
+  } else {
+    cl.innerHTML = pending.map(t => `
+      <div class="checklist-item" onclick="switchPage('checklist')">
+        <div class="check-circle">○</div>
+        <div class="task-name">${t.name}</div>
+        <span style="font-size:0.75rem;color:var(--muted)">→</span>
+      </div>`).join('') +
+      (allTasks.filter(t=>!state.checklistState[t.id]).length > 3 ?
+        `<p style="font-size:0.78rem;color:var(--muted);text-align:center;margin-top:6px">+${allTasks.filter(t=>!state.checklistState[t.id]).length-3} việc nữa...</p>` : '');
+  }
+
+  // Supply reminder
+  const supplyChecked = localStorage.getItem(`supplyChecked_${today()}`);
+  document.getElementById('supplyReminderCard').style.display = supplyChecked ? 'none' : 'block';
+}
+
+function renderAlerts() {
+  const alerts = [];
+  const now = new Date();
+  const hour = now.getHours();
+
+  // Chưa check-in sau 9h
+  if (!state.todayData.checkin && hour >= 9) {
+    alerts.push({ type: 'danger', msg: '🚨 Chưa check-in! Có thể bị trừ thưởng chuyên cần.' });
+  }
+
+  // Checklist sáng chưa xong sau 10h
+  if (hour >= 10) {
+    const pending = MORNING_TASKS.filter(t => !state.checklistState[t.id]);
+    if (pending.length > 0) alerts.push({ type: 'warning', msg: `⚠️ Còn ${pending.length} việc buổi sáng chưa xong!` });
+  }
+
+  // Checklist chiều chưa xong sau 17h
+  if (hour >= 17) {
+    const pending = AFTERNOON_TASKS.filter(t => !state.checklistState[t.id]);
+    if (pending.length > 0) alerts.push({ type: 'danger', msg: `🚨 Còn ${pending.length} việc buổi chiều! Sắp hết giờ.` });
+  }
+
+  const box = document.getElementById('alertsBox');
+  box.innerHTML = alerts.map(a => `
+    <div style="background:${a.type==='danger'?'#fee2e2':'#fef3c7'};border-radius:12px;padding:12px 14px;margin-bottom:8px;font-size:0.85rem;color:${a.type==='danger'?'#b91c1c':'#92400e'}">
+      ${a.msg}
+    </div>`).join('');
+}
+
+function calcBonus() {
+  const d = state.todayData;
+  let attendance = DB_CONFIG.BONUS_ATTENDANCE;
+  let tasks = DB_CONFIG.BONUS_TASKS;
+  const deductions = JSON.parse(localStorage.getItem(`deductions_${monthKey()}`) || '[]');
+  const totalDeduct = deductions.reduce((s, d) => s + d.amount, 0);
+  return {
+    attendance: Math.max(0, attendance),
+    tasks: Math.max(0, tasks - totalDeduct),
+    total: Math.max(0, attendance + tasks - totalDeduct)
+  };
+}
+
+// ─── CHECK-IN / CHECK-OUT ──────────────────────────────
+async function doCheckin() {
+  const btn = document.getElementById('checkinBtn');
+  btn.disabled = true;
+  btn.textContent = '📡 Đang xác định vị trí...';
+
+  try {
+    const gps = await checkInOffice();
+    if (!gps.ok) {
+      showToast(`❌ Bạn cách văn phòng ${gps.distance}m (cần trong ${DB_CONFIG.OFFICE_RADIUS_M}m)`, 'danger');
+      btn.disabled = false;
+      btn.textContent = '📍 Check-in Văn Phòng';
+      return;
+    }
+    const now = new Date();
+    const timeStr = now.toTimeString().slice(0,5);
+    const [ch, cm] = timeStr.split(':').map(Number);
+    const nowMin = ch * 60 + cm;
+    // Xác định ca theo giờ hiện tại
+    const [ms, mm] = DB_CONFIG.MORNING_START.split(':').map(Number);
+    const [as2, am2] = DB_CONFIG.AFTERNOON_START.split(':').map(Number);
+    const [es, em] = DB_CONFIG.EVENING_START.split(':').map(Number);
+    let shiftStart, shiftLabel;
+    if (nowMin < as2 * 60 + am2) {
+      shiftStart = DB_CONFIG.MORNING_START; shiftLabel = 'sáng';
+    } else if (nowMin < es * 60 + em) {
+      shiftStart = DB_CONFIG.AFTERNOON_START; shiftLabel = 'chiều';
+    } else {
+      shiftStart = DB_CONFIG.EVENING_START; shiftLabel = 'tối';
+    }
+    const [sh, sm] = shiftStart.split(':').map(Number);
+    const diffMin = nowMin - (sh * 60 + sm);
+    const late = diffMin > DB_CONFIG.LATE_GRACE_MINUTES;
+
+    await apiCall('checkin', {
+      empId: state.user.id, date: today(), time: timeStr,
+      lat: gps.lat, lng: gps.lng, late, lateMin: Math.max(0, diffMin)
+    });
+
+    state.todayData.checkin = timeStr;
+    state.todayData.late = late;
+    state.todayData.lateMin = Math.max(0, diffMin);
+    localStorage.setItem(`todayData_${today()}`, JSON.stringify(state.todayData));
+
+    showToast(late ? `⚠️ Check-in lúc ${timeStr} — trễ ${diffMin} phút` : `✅ Check-in ${timeStr} — Đúng giờ!`, late ? 'warning' : 'success');
+    renderHome();
+  } catch(e) {
+    showToast('❌ Không lấy được GPS. Bật GPS và thử lại.', 'danger');
+    btn.disabled = false;
+    btn.textContent = '📍 Check-in Văn Phòng';
+  }
+}
+
+async function doCheckout() {
+  const btn = document.getElementById('checkinBtn');
+  btn.disabled = true;
+  btn.textContent = '📡 Xác định vị trí...';
+  try {
+    const gps = await checkInOffice();
+    if (!gps.ok) {
+      showToast(`❌ Bạn cách văn phòng ${gps.distance}m — phải check-out tại văn phòng!`, 'danger');
+      btn.disabled = false;
+      btn.textContent = '🏁 Check-out';
+      return;
+    }
+    const timeStr = nowTime();
+    const [ch, cm] = timeStr.split(':').map(Number);
+    const nowMin = ch * 60 + cm;
+    // Xác định giờ kết thúc ca theo ca đã check-in
+    const checkinTime = state.todayData.checkin || '';
+    const [ih] = checkinTime.split(':').map(Number);
+    const isMorning = ih < 13;
+    const [endH, endM] = (isMorning ? DB_CONFIG.MORNING_END : DB_CONFIG.AFTERNOON_END).split(':').map(Number);
+    const endMin = endH * 60 + endM;
+    const earlyMin = endMin - nowMin;
+    const early = earlyMin > DB_CONFIG.LATE_GRACE_MINUTES;
+
+    await apiCall('checkout', { empId: state.user.id, date: today(), time: timeStr,
+      lat: gps.lat, lng: gps.lng, early, earlyMin: Math.max(0, earlyMin) });
+    state.todayData.checkout = timeStr;
+    state.todayData.early = early;
+    state.todayData.earlyMin = Math.max(0, earlyMin);
+    localStorage.setItem(`todayData_${today()}`, JSON.stringify(state.todayData));
+
+    if (early) {
+      showToast(`⚠️ Check-out lúc ${timeStr} — về sớm ${earlyMin} phút so với ca!`, 'warning');
+    } else {
+      showToast(`✅ Check-out lúc ${timeStr}. Về an toàn nhé!`, 'success');
+    }
+    renderHome();
+  } catch(e) {
+    showToast('❌ Không lấy được GPS. Bật GPS và thử lại.', 'danger');
+    btn.disabled = false;
+    btn.textContent = '🏁 Check-out';
+  }
+}
+
+// ─── CHECKLIST ─────────────────────────────────────────
+function renderChecklist() {
+  document.getElementById('morningList').innerHTML = MORNING_TASKS.map(t => taskHTML(t)).join('');
+  document.getElementById('afternoonList').innerHTML = AFTERNOON_TASKS.map(t => taskHTML(t)).join('');
+}
+
+function taskHTML(t) {
+  const done = !!state.checklistState[t.id];
+  return `<div class="checklist-item ${done?'done':''}" id="task_${t.id}" onclick="toggleTask('${t.id}')">
+    <div class="check-circle">${done?'✓':''}</div>
+    <div style="flex:1">
+      <div class="task-name">${t.name}</div>
+      <div class="task-meta">${t.detail}</div>
+    </div>
+  </div>`;
+}
+
+async function toggleTask(id) {
+  state.checklistState[id] = !state.checklistState[id];
+  const doneTime = state.checklistState[id] ? nowTime() : null;
+
+  // Update UI ngay
+  const el = document.getElementById(`task_${id}`);
+  if (el) {
+    el.className = `checklist-item ${state.checklistState[id]?'done':''}`;
+    el.querySelector('.check-circle').textContent = state.checklistState[id] ? '✓' : '';
+  }
+
+  // Save
+  state.todayData.checklist = state.checklistState;
+  localStorage.setItem(`todayData_${today()}`, JSON.stringify(state.todayData));
+  await apiCall('updateChecklist', { empId: state.user.id, date: today(), taskId: id, done: state.checklistState[id], doneTime });
+  renderHome();
+}
+
+// ─── SUPPLY ────────────────────────────────────────────
+function renderSupply() {
+  const last = JSON.parse(localStorage.getItem(`supply_${today()}`) || 'null');
+  document.getElementById('supplyList').innerHTML = SUPPLY_ITEMS.map(item => {
+    const val = last ? (last[item.key] || '') : '';
+    const isAlert = val !== '' && Number(val) < item.alert;
+    return `<div class="supply-item">
+      <div class="supply-info">
+        <div class="supply-name">${item.name}</div>
+        <div class="supply-count">Cảnh báo khi < ${item.alert} ${item.unit}</div>
+      </div>
+      <input type="number" class="supply-input ${isAlert?'supply-alert':''}" id="sup_${item.key}"
+        value="${val}" placeholder="0" min="0"
+        oninput="checkSupplyAlert(this,'${item.key}')">
+    </div>`;
+  }).join('');
+}
+
+function checkSupplyAlert(input, key) {
+  const item = SUPPLY_ITEMS.find(i => i.key === key);
+  if (!item) return;
+  if (Number(input.value) < item.alert && input.value !== '') {
+    input.classList.add('supply-alert');
+  } else {
+    input.classList.remove('supply-alert');
+  }
+}
+
+async function submitSupply() {
+  const data = {};
+  let hasAlert = false;
+  SUPPLY_ITEMS.forEach(item => {
+    const val = document.getElementById(`sup_${item.key}`)?.value;
+    data[item.key] = val === '' ? null : Number(val);
+    if (data[item.key] !== null && data[item.key] < item.alert) hasAlert = true;
+  });
+
+  localStorage.setItem(`supply_${today()}`, JSON.stringify(data));
+  localStorage.setItem(`supplyChecked_${today()}`, '1');
+
+  await apiCall('submitSupply', { empId: state.user.id, date: today(), data, hasAlert });
+  showToast(hasAlert ? '⚠️ Đã lưu! Một số dụng cụ dưới mức — Boss đã được thông báo.' : '✅ Báo cáo kho đã lưu!', hasAlert ? 'warning' : 'success');
+  document.getElementById('supplyReminderCard').style.display = 'none';
+}
+
+let currentReturnType = 'customer';
+function switchReturnType(type) {
+  currentReturnType = type;
+  document.getElementById('returnFormCustomer').style.display = type === 'customer' ? 'block' : 'none';
+  document.getElementById('returnFormCarrier').style.display = type === 'carrier' ? 'block' : 'none';
+  const btnC = document.getElementById('btnReturnTypeCustomer');
+  const btnK = document.getElementById('btnReturnTypeCarrier');
+  btnC.style.background = type === 'customer' ? 'var(--primary)' : 'white';
+  btnC.style.color = type === 'customer' ? 'white' : 'var(--muted)';
+  btnC.style.borderColor = type === 'customer' ? 'var(--primary)' : 'var(--muted)';
+  btnK.style.background = type === 'carrier' ? 'var(--primary)' : 'white';
+  btnK.style.color = type === 'carrier' ? 'white' : 'var(--muted)';
+  btnK.style.borderColor = type === 'carrier' ? 'var(--primary)' : 'var(--muted)';
+}
+
+async function submitReturnCustomer() {
+  const orderId = document.getElementById('r1_orderId').value.trim();
+  const amount = document.getElementById('r1_amount').value.trim();
+  const bankInfo = document.getElementById('r1_bankInfo').value.trim();
+  const condition = document.getElementById('r1_condition').value;
+  if (!orderId || !amount || !bankInfo) { showToast('Vui lòng nhập đầy đủ thông tin!', 'danger'); return; }
+
+  const f1 = document.getElementById('r1_photoShipper').files[0];
+  const f2 = document.getElementById('r1_photoActual').files[0];
+  const f3 = document.getElementById('r1_qrPhoto').files[0];
+  const photoShipper = f1 ? await toBase64(f1) : null;
+  const photoActual = f2 ? await toBase64(f2) : null;
+  const photoQR = f3 ? await toBase64(f3) : null;
+
+  await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'customer',
+    orderId, amount, bankInfo, condition, photoShipper, photoActual, photoQR });
+  showToast('✅ Đã ghi nhận! Boss sẽ xem xét và hoàn tiền cho khách.', 'success');
+  document.getElementById('r1_orderId').value = '';
+  document.getElementById('r1_amount').value = '';
+  document.getElementById('r1_bankInfo').value = '';
+  document.getElementById('r1_qrPhoto').value = '';
+  document.getElementById('r1_qrPreviewArea').innerHTML = '<div style="font-size:1.5rem">🔳</div><div style="font-size:0.82rem;color:var(--muted);margin-top:4px">Chụp hoặc chọn ảnh mã QR</div>';
+}
+
+async function submitReturnCarrier() {
+  const count = document.getElementById('r2_count').value;
+  const orderIds = document.getElementById('r2_orderIds').value.trim();
+  if (!count || !orderIds) { showToast('Vui lòng nhập đầy đủ thông tin!', 'danger'); return; }
+
+  const f1 = document.getElementById('r2_photoOrders').files[0];
+  const f2 = document.getElementById('r2_photoPancake').files[0];
+  const photoOrders = f1 ? await toBase64(f1) : null;
+  const photoPancake = f2 ? await toBase64(f2) : null;
+
+  await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'carrier',
+    count, orderIds, photoOrders, photoPancake });
+  showToast('✅ Đã ghi nhận hàng vận chuyển hoàn về!', 'success');
+  document.getElementById('r2_count').value = '';
+  document.getElementById('r2_orderIds').value = '';
+}
+
+// ─── EVENING SHIFT ─────────────────────────────────────
+async function startEveningShift() {
+  state.shiftStart = new Date();
+  const shiftData = { start: state.shiftStart.toISOString() };
+  localStorage.setItem('activeShift', JSON.stringify(shiftData));
+
+  await apiCall('startShift', { empId: state.user.id, date: today(), startTime: nowTime() });
+  showActiveShift();
+  startShiftTimer();
+  schedulePing();
+  showToast('🟢 Ca tối bắt đầu! Chúc làm việc hiệu quả.', 'success');
+}
+
+function showActiveShift() {
+  document.getElementById('eveningShiftActive').classList.remove('hidden');
+  document.getElementById('eveningShiftIdle').classList.add('hidden');
+  const startStr = state.shiftStart.toTimeString().slice(0,5);
+  document.getElementById('shiftStartDisplay').textContent = startStr;
+}
+
+function startShiftTimer() {
+  if (state.shiftTimer) clearInterval(state.shiftTimer);
+  state.shiftTimer = setInterval(() => {
+    const elapsed = Date.now() - state.shiftStart.getTime();
+    const h = Math.floor(elapsed / 3600000);
+    const m = Math.floor((elapsed % 3600000) / 60000);
+    const s = Math.floor((elapsed % 60000) / 1000);
+    document.getElementById('shiftElapsed').textContent =
+      `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }, 1000);
+}
+
+async function endEveningShift() {
+  if (!confirm('Kết thúc ca tối và tính giờ?')) return;
+  clearInterval(state.shiftTimer);
+  clearTimeout(state.pingTimer);
+  localStorage.removeItem('activeShift');
+
+  const elapsed = Date.now() - state.shiftStart.getTime();
+  const hours = elapsed / 3600000;
+  const endTime = nowTime();
+
+  await apiCall('endShift', { empId: state.user.id, date: today(), endTime, hours: hours.toFixed(2) });
+  state.shiftStart = null;
+  document.getElementById('eveningShiftActive').classList.add('hidden');
+  document.getElementById('eveningShiftIdle').classList.remove('hidden');
+  showToast(`✅ Ca tối kết thúc! ${hours.toFixed(1)}h × 26.000đ = ${formatVND(hours * 26000)}`, 'success');
+  renderSalary();
+}
+
+// ─── SCHEDULE ──────────────────────────────────────────
+const DAY_NAMES = ['Thứ 2','Thứ 3','Thứ 4','Thứ 5','Thứ 6','Thứ 7','Chủ Nhật'];
+const DAY_KEYS  = ['mon','tue','wed','thu','fri','sat','sun'];
+
+function getWeekDates(offset = 0) {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
+  return DAY_KEYS.map((_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d.toISOString().slice(0,10);
+  });
+}
+
+function weekKey(dates) { return dates[0]; }
+
+// Ngày lễ Việt Nam (cố định + Tết 2026)
+const VN_HOLIDAYS = {
+  '01-01': 'Tết Dương Lịch',
+  '04-30': 'Giải phóng miền Nam',
+  '05-01': 'Quốc tế Lao động',
+  '09-02': 'Quốc khánh',
+  // 2026 specific
+  '2026-02-15': 'Tết Nguyên Đán', '2026-02-16': 'Tết Nguyên Đán',
+  '2026-02-17': 'Tết Nguyên Đán', '2026-02-18': 'Tết Nguyên Đán',
+  '2026-02-19': 'Tết Nguyên Đán', '2026-02-20': 'Tết Nguyên Đán',
+  '2026-04-27': 'Giỗ Tổ Hùng Vương',
+};
+
+function isHoliday(dateStr) {
+  // dateStr = 'YYYY-MM-DD'
+  const mmdd = dateStr.slice(5); // MM-DD
+  return VN_HOLIDAYS[dateStr] || VN_HOLIDAYS[mmdd] || null;
+}
+
+function getOTRate(dateStr) {
+  return isHoliday(dateStr) ? DB_CONFIG.OVERTIME_RATE * 2 : DB_CONFIG.OVERTIME_RATE;
+}
+
+async function renderSchedule() {
+  const dates = getWeekDates(0);
+  const res = await apiCall('getSchedule', { empId: state.user.id, weekStart: weekKey(dates) });
+  const schedule = (res.ok && res.data) ? res.data : {};
+
+  // Hiển thị lịch tuần này
+  const view = document.getElementById('weekScheduleView');
+  view.innerHTML = dates.map((date, i) => {
+    const s = schedule[DAY_KEYS[i]] || {};
+    const shift = s.shift || 'off';
+    const holiday = isHoliday(date);
+    const shiftLabel = { morning:'☀️ Sáng', afternoon:'🌤 Chiều', fullday:'🌞 Cả ngày', evening:'🌙 Ngoài giờ', off:'🔴 Nghỉ' }[shift] || '—';
+    const extra = shift === 'evening' ? ` (${s.eveningStart||''}–${s.eveningEnd||''}, ${s.plannedHours||0}h)` : '';
+    const holidayTag = holiday ? ` <span style="background:#fee2e2;color:#ef4444;border-radius:4px;padding:1px 5px;font-size:0.7rem">🎌 ${holiday} ×2</span>` : '';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee;font-size:0.85rem">
+      <span style="font-weight:600">${DAY_NAMES[i]}${holidayTag}<br><span style="font-weight:400;color:var(--muted);font-size:0.75rem">${date}</span></span>
+      <span>${shiftLabel}${extra}</span>
+    </div>`;
+  }).join('');
+
+  // Kiểm tra cửa sổ đăng ký: Chủ Nhật 15:00–23:30
+  const regCard = document.getElementById('scheduleRegCard');
+  const now = new Date();
+  const dow = now.getDay(); // 0 = Chủ Nhật
+  const h = now.getHours(), m = now.getMinutes();
+  const nowMin = h * 60 + m;
+  const openMin  = DB_CONFIG.SCHEDULE_OPEN_HOUR * 60;
+  const closeMin = DB_CONFIG.SCHEDULE_CLOSE_HOUR * 60 + DB_CONFIG.SCHEDULE_CLOSE_MIN;
+  const isOpen = dow === 0 && nowMin >= openMin && nowMin < closeMin;
+
+  regCard.style.display = 'block';
+  if (isOpen) {
+    buildScheduleForm();
+  } else {
+    const nextSunday = new Date(now);
+    nextSunday.setDate(now.getDate() + (7 - dow) % 7 || 7);
+    const dateStr = nextSunday.toLocaleDateString('vi-VN', {day:'2-digit',month:'2-digit'});
+    document.getElementById('scheduleRegForm').innerHTML = `
+      <div style="text-align:center;padding:16px 0;color:var(--muted);font-size:0.85rem">
+        <div style="font-size:2rem;margin-bottom:8px">🔒</div>
+        <div style="font-weight:600;color:var(--text);margin-bottom:4px">Đăng ký lịch đã đóng</div>
+        <div>Cửa sổ đăng ký: <strong>Chủ Nhật ${dateStr} — 15:00 đến 23:30</strong></div>
+        <div style="margin-top:8px;font-size:0.78rem">Muốn thay đổi lịch? Nhắn cho Boss trước ít nhất 1 ngày để được duyệt.</div>
+      </div>`;
+  }
+
+  // Card ca ngoài giờ hôm nay
+  const todayDate = today();
+  const todayIdx = dates.indexOf(todayDate);
+  const todaySchedule = todayIdx >= 0 ? (schedule[DAY_KEYS[todayIdx]] || {}) : {};
+  const otCard = document.getElementById('otShiftCard');
+
+  if (todaySchedule.hasOT) {
+    otCard.style.display = 'block';
+    const rate = getOTRate(todayDate);
+    const holiday = isHoliday(todayDate);
+    document.getElementById('otShiftInfo').textContent =
+      `${todaySchedule.eveningStart||'—'} – ${todaySchedule.eveningEnd||'—'} | ${todaySchedule.plannedHours||0}h dự kiến × ${formatVND(rate)}/giờ${holiday ? ' 🎌 ×2' : ''}`;
+    // Restore state nếu đã bắt đầu
+    const otState = JSON.parse(localStorage.getItem(`otState_${todayDate}`) || 'null');
+    if (otState?.done) {
+      showOTState('done');
+      document.getElementById('otDoneSummary').textContent =
+        `✅ ${otState.hours}h thực tế · ${formatVND(otState.hours * rate)}`;
+    } else if (otState?.startTime) {
+      state.otStart = new Date(otState.startTime);
+      showOTState('running');
+      startOTTimer();
+    } else {
+      showOTState('idle');
+    }
+  } else {
+    otCard.style.display = 'none';
+  }
+}
+
+let otTimerInterval = null;
+
+function showOTState(s) {
+  document.getElementById('otIdle').classList.toggle('hidden', s !== 'idle');
+  document.getElementById('otRunning').classList.toggle('hidden', s !== 'running');
+  document.getElementById('otDone').classList.toggle('hidden', s !== 'done');
+}
+
+function startOTTimer() {
+  if (otTimerInterval) clearInterval(otTimerInterval);
+  otTimerInterval = setInterval(() => {
+    if (!state.otStart) return;
+    const elapsed = Date.now() - state.otStart.getTime();
+    const h = Math.floor(elapsed / 3600000);
+    const m = Math.floor((elapsed % 3600000) / 60000);
+    const s = Math.floor((elapsed % 60000) / 1000);
+    document.getElementById('otElapsedDisplay').textContent =
+      `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  }, 1000);
+}
+
+async function startOTShift() {
+  const startTime = nowTime();
+  state.otStart = new Date();
+  localStorage.setItem(`otState_${today()}`, JSON.stringify({ startTime: state.otStart.toISOString() }));
+  document.getElementById('otStartDisplay').textContent = startTime;
+  showOTState('running');
+  startOTTimer();
+  await apiCall('startOTShift', { empId: state.user.id, date: today(), startTime });
+  showToast(`🟢 Bắt đầu ca ngoài giờ lúc ${startTime}`, 'success');
+}
+
+async function endOTShift() {
+  if (!state.otStart) return;
+  if (!confirm('Kết thúc ca ngoài giờ?')) return;
+  clearInterval(otTimerInterval);
+  const endTime = nowTime();
+  const elapsed = (Date.now() - state.otStart.getTime()) / 3600000;
+  const hours = Math.round(elapsed * 10) / 10;
+  const rate = getOTRate(today());
+  const pay = hours * rate;
+
+  localStorage.setItem(`otState_${today()}`, JSON.stringify({
+    startTime: state.otStart.toISOString(), done: true, hours, endTime
+  }));
+  showOTState('done');
+  document.getElementById('otDoneSummary').textContent = `✅ ${hours}h thực tế · ${formatVND(pay)}`;
+
+  await apiCall('endOTShift', { empId: state.user.id, date: today(), endTime, hours });
+  showToast(`🔴 Ca kết thúc! ${hours}h × ${formatVND(rate)} = ${formatVND(pay)}`, 'success');
+  state.otStart = null;
+}
+
+function buildScheduleForm() {
+  const nextDates = getWeekDates(1);
+  document.getElementById('scheduleRegForm').innerHTML = nextDates.map((date, i) => {
+    const holiday = isHoliday(date);
+    const holidayBadge = holiday ? `<span style="background:#fee2e2;color:#ef4444;border-radius:4px;padding:1px 6px;font-size:0.72rem;margin-left:6px">🎌 ${holiday} ×2</span>` : '';
+    const otRate = holiday ? DB_CONFIG.OVERTIME_RATE * 2 : DB_CONFIG.OVERTIME_RATE;
+    return `<div style="margin-bottom:12px;padding:10px;background:${holiday?'#fff5f5':'var(--bg)'};border-radius:10px;border:1px solid ${holiday?'#fecaca':'#eee'}">
+      <div style="font-weight:700;font-size:0.88rem;margin-bottom:8px">${DAY_NAMES[i]} — ${date}${holidayBadge}</div>
+
+      <div style="font-size:0.78rem;color:var(--muted);margin-bottom:4px">Ca chính</div>
+      <select id="sched_${DAY_KEYS[i]}"
+        style="width:100%;padding:8px;border-radius:8px;border:1px solid #ddd;font-size:0.85rem;margin-bottom:10px">
+        <option value="fullday">🌞 Cả ngày (8:00–17:30)</option>
+        <option value="morning">☀️ Sáng (8:00–12:00)</option>
+        <option value="afternoon">🌤 Chiều (13:00–17:30)</option>
+        <option value="off">🔴 Nghỉ</option>
+      </select>
+
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <input type="checkbox" id="hasOT_${DAY_KEYS[i]}" onchange="toggleEveningInputs('${DAY_KEYS[i]}')"
+          style="width:16px;height:16px;cursor:pointer">
+        <label for="hasOT_${DAY_KEYS[i]}" style="font-size:0.82rem;font-weight:600;color:var(--primary);cursor:pointer">
+          🌙 Đăng ký ca ngoài giờ${holiday ? ' (×2 lương)' : ''}
+        </label>
+      </div>
+      <div id="eveningInputs_${DAY_KEYS[i]}" style="display:none;padding:8px;background:white;border-radius:8px;border:1px solid #ddd">
+        <div style="display:flex;gap:8px;margin-bottom:6px">
+          <div style="flex:1"><label style="font-size:0.78rem;color:var(--muted)">Từ giờ</label>
+            <input type="time" id="eStart_${DAY_KEYS[i]}" value="19:30" min="00:00" max="23:59"
+              style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd"></div>
+          <div style="flex:1"><label style="font-size:0.78rem;color:var(--muted)">Đến giờ</label>
+            <input type="time" id="eEnd_${DAY_KEYS[i]}" value="22:00" min="00:00" max="23:59"
+              style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd"></div>
+        </div>
+        <label style="font-size:0.78rem;color:var(--muted)">Số giờ dự kiến</label>
+        <select id="eHours_${DAY_KEYS[i]}" style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd;font-size:0.85rem;margin-bottom:6px">
+          ${[1,2,3,4,5,6,7,8].map(h=>`<option value="${h}"${h===2?' selected':''}>${h} tiếng</option>`).join('')}
+        </select>
+        <div style="font-size:0.78rem;${holiday?'color:#ef4444;font-weight:600':'color:var(--muted)'}">
+          ${holiday?'🎌 Ngày lễ — ':''} Lương ngoài giờ: ${formatVND(otRate)}/giờ
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleEveningInputs(dayKey) {
+  const checked = document.getElementById(`hasOT_${dayKey}`).checked;
+  document.getElementById(`eveningInputs_${dayKey}`).style.display = checked ? 'block' : 'none';
+}
+
+async function submitSchedule() {
+  const nextDates = getWeekDates(1);
+  const schedule = {};
+  DAY_KEYS.forEach((key, i) => {
+    const shift = document.getElementById(`sched_${key}`)?.value || 'off';
+    const hasOT = document.getElementById(`hasOT_${key}`)?.checked || false;
+    schedule[key] = { date: nextDates[i], shift, hasOT };
+    if (hasOT) {
+      schedule[key].eveningStart = document.getElementById(`eStart_${key}`)?.value || '19:30';
+      schedule[key].eveningEnd   = document.getElementById(`eEnd_${key}`)?.value || '22:00';
+      schedule[key].plannedHours = Number(document.getElementById(`eHours_${key}`)?.value || 2);
+    }
+  });
+  const weekStart = weekKey(nextDates);
+  const res = await apiCall('registerSchedule', { empId: state.user.id, weekStart, schedule });
+  if (res.ok) {
+    showToast('✅ Đã gửi lịch tuần sau cho Boss!', 'success');
+    document.getElementById('scheduleRegCard').style.display = 'none';
+  } else {
+    showToast('Gửi lịch thất bại, thử lại nhé!', 'danger');
+  }
+}
+
+async function loadOvertimeList() {
+  const res = await apiCall('getOvertimeList', { empId: state.user.id, month: monthKey() });
+  const list = document.getElementById('myOvertimeList');
+  if (!res.ok || !res.data?.length) {
+    list.innerHTML = `<p style="font-size:0.85rem;color:var(--muted)">Chưa có ca tăng ca nào tháng này</p>`;
+    return;
+  }
+  list.innerHTML = res.data.map(ot => `
+    <div style="background:var(--bg);border-radius:10px;padding:10px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:0.85rem;font-weight:600">${formatDateVN(ot.date)}</span>
+        <span class="badge ${ot.approved?'badge-success':ot.rejected?'badge-danger':'badge-warning'}">
+          ${ot.approved?'✅ Duyệt':ot.rejected?'❌ Từ chối':'⏳ Chờ duyệt'}
+        </span>
+      </div>
+      <div style="font-size:0.78rem;color:var(--muted);margin-top:4px">${ot.start} - ${ot.end} | ${ot.hours||'—'}h</div>
+    </div>`).join('');
+}
+
+async function submitShiftResult() {
+  const desc = document.getElementById('shiftWorkDesc').value.trim();
+  if (!desc) { showToast('Mô tả công việc đã làm nhé!', 'danger'); return; }
+  const photoFile = document.getElementById('shiftPhoto').files[0];
+  let photoBase64 = null;
+  if (photoFile) photoBase64 = await toBase64(photoFile);
+  await apiCall('submitShiftResult', { empId: state.user.id, date: today(), desc, photo: photoBase64 });
+  showToast('✅ Đã nộp kết quả ca tối!', 'success');
+}
+
+// ─── RANDOM PING ───────────────────────────────────────
+function schedulePing() {
+  const min = DB_CONFIG.PING_INTERVAL_MIN;
+  const max = DB_CONFIG.PING_INTERVAL_MAX;
+  const delay = (Math.random() * (max - min) + min) * 60 * 1000;
+  state.pingTimer = setTimeout(showPing, delay);
+}
+
+let pingSeconds = 300;
+function showPing() {
+  document.getElementById('pingOverlay').classList.remove('hidden');
+  pingSeconds = 300;
+  updatePingCountdown();
+  state.pingCountdownTimer = setInterval(() => {
+    pingSeconds--;
+    updatePingCountdown();
+    if (pingSeconds <= 0) {
+      clearInterval(state.pingCountdownTimer);
+      // Ghi nhận không phản hồi
+      apiCall('pingMiss', { empId: state.user.id, date: today(), time: nowTime() });
+      document.getElementById('pingOverlay').classList.add('hidden');
+      showToast('⚠️ Không phản hồi ping — Boss đã được thông báo', 'danger');
+      schedulePing();
+    }
+  }, 1000);
+}
+
+function updatePingCountdown() {
+  const m = Math.floor(pingSeconds / 60);
+  const s = pingSeconds % 60;
+  document.getElementById('pingCountdown').textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+async function confirmPing() {
+  clearInterval(state.pingCountdownTimer);
+  document.getElementById('pingOverlay').classList.add('hidden');
+  await apiCall('pingOk', { empId: state.user.id, date: today(), time: nowTime() });
+  showToast('✅ Xác nhận thành công!', 'success');
+  schedulePing();
+}
+
+// ─── SALARY PAGE ───────────────────────────────────────
+async function renderSalary() {
+  const bonus = calcBonus();
+  document.getElementById('totalBonusDisplay').textContent = formatVND(bonus.total);
+  document.getElementById('bonusAttendance').textContent = formatVND(bonus.attendance);
+  document.getElementById('bonusTasks').textContent = formatVND(bonus.tasks);
+
+  const deductions = JSON.parse(localStorage.getItem(`deductions_${monthKey()}`) || '[]');
+  const deductEl = document.getElementById('deductionList');
+  deductEl.innerHTML = deductions.length ? deductions.map(d =>
+    `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem">
+      <span>${d.reason}</span>
+      <span style="color:var(--danger);font-weight:700">-${formatVND(d.amount)}</span>
+    </div>`).join('') : `<p style="font-size:0.85rem;color:var(--muted)">Chưa có khoản trừ nào 🎉</p>`;
+
+  // OT summary
+  try {
+    const res = await apiCall('getOTSummary', { empId: state.user.id, month: monthKey() });
+    if (res.ok && res.data) {
+      document.getElementById('otHours').textContent = `${res.data.hours}h`;
+      document.getElementById('otPay').textContent = formatVND(res.data.hours * DB_CONFIG.OVERTIME_RATE);
+    }
+  } catch(e) {}
+
+  // Sales bonus
+  try {
+    const res = await apiCall('getSalesBonus', { empId: state.user.id, month: monthKey() });
+    if (res.ok && res.data?.amount) {
+      document.getElementById('bonusSales').textContent = formatVND(res.data.amount);
+      document.getElementById('fillSales').style.width = '100%';
+    }
+  } catch(e) {}
+}
+
+// ─── UTILS ─────────────────────────────────────────────
+function switchPage(name, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  if (btn) btn.classList.add('active');
+  else {
+    const navBtns = { home: 0, checklist: 1, inventory: 2, overtime: 3, salary: 4 };
+    document.querySelectorAll('.nav-item')[navBtns[name] ?? 0].classList.add('active');
+  }
+  if (name === 'overtime') renderSchedule();
+  if (name === 'salary') renderSalary();
+}
+
+function showToast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+    background:${type==='success'?'#22c55e':type==='danger'?'#ef4444':'#f59e0b'};
+    color:white;padding:12px 20px;border-radius:12px;font-size:0.85rem;font-weight:600;
+    z-index:500;max-width:90vw;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.2);`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+
+function previewQRPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('r1_qrPreviewArea').innerHTML =
+      `<img src="${e.target.result}" style="max-width:100%;max-height:180px;border-radius:8px;object-fit:contain">`;
+  };
+  reader.readAsDataURL(file);
+}
+
+function previewPhoto(input, previewId) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById(previewId);
+    img.src = e.target.result;
+    img.classList.remove('hidden');
+  };
+  reader.readAsDataURL(file);
+}
+
+function toBase64(file) {
+  return new Promise(resolve => {
+    const r = new FileReader();
+    r.onload = e => resolve(e.target.result.split(',')[1]);
+    r.readAsDataURL(file);
+  });
+}
+
+// ─── LOGIN ─────────────────────────────────────────────
+async function doLogin() {
+  const code = document.getElementById('loginCode').value.trim().toUpperCase();
+  const pass = document.getElementById('loginPass').value;
+  if (!code || !pass) { document.getElementById('loginError').textContent = 'Nhập đầy đủ thông tin!'; return; }
+
+  const res = await apiCall('login', { code, pass });
+  if (res.ok && res.user) {
+    setCurrentUser(res.user);
+    document.getElementById('loginModal').classList.add('hidden');
+    state.user = res.user;
+    setupHeader();
+    await loadTodayData();
+    renderHome();
+    renderChecklist();
+    renderSupply();
+    renderSalary();
+  } else {
+    document.getElementById('loginError').textContent = '❌ Sai mã nhân viên hoặc mật khẩu!';
+  }
+}
+
+function logoutEmployee() {
+  localStorage.removeItem('hrUser');
+  location.reload();
+}
+
+// ─── PWA ───────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+
+init();
+</script>
+</body>
+</html>
