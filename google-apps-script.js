@@ -45,6 +45,7 @@ function doGet(e) {
       case 'login':               result = handleLogin(data); break;
       case 'getEmployees':        result = getEmployees(); break;
       case 'addEmployee':         result = addEmployee(data); break;
+      case 'deleteEmployee':      result = deleteEmployee(data); break;
       case 'checkin':             result = handleCheckin(data); break;
       case 'checkout':            result = handleCheckout(data); break;
       case 'updateChecklist':     result = updateChecklist(data); break;
@@ -190,6 +191,19 @@ function getEmployees() {
     id: e.id, name: e.name, phone: e.phone, salary: Number(e.salary)||0, color: e.color, created: e.created
   }));
   return { ok: true, data };
+}
+
+function deleteEmployee(data) {
+  const { empId } = data;
+  const sheet = getSheet(SHEETS.EMPLOYEES);
+  const vals = sheet.getDataRange().getValues();
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][0]) === String(empId)) {
+      sheet.deleteRow(i + 1);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Không tìm thấy nhân viên' };
 }
 
 function addEmployee(data) {

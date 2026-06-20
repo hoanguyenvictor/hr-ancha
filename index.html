@@ -735,11 +735,26 @@ function showEmpDetail(empId) {
       <button class="btn btn-warning btn-sm" onclick="addDeduction('${empId}')">⚠️ Thêm Trừ Thưởng</button>
       <button class="btn btn-success btn-sm" onclick="approveAllTasks('${empId}')">✅ Xác Nhận OK</button>
     </div>
+    <div style="margin-top:10px">
+      <button class="btn btn-danger btn-sm" style="width:100%" onclick="confirmDeleteEmployee('${empId}','${emp.name}')">🗑️ Xoá Nhân Viên</button>
+    </div>
   `;
   document.getElementById('empDetailModal').classList.remove('hidden');
 }
 
 function closeEmpDetail() { document.getElementById('empDetailModal').classList.add('hidden'); }
+
+async function confirmDeleteEmployee(empId, empName) {
+  if (!confirm(`Xác nhận xoá nhân viên "${empName}" (${empId})?\n\nThao tác này không thể hoàn tác!`)) return;
+  const stored = JSON.parse(localStorage.getItem('employees') || '[]');
+  localStorage.setItem('employees', JSON.stringify(stored.filter(e => e.id !== empId)));
+  employees = employees.filter(e => e.id !== empId);
+  apiCall('deleteEmployee', { empId }).catch(() => {});
+  closeEmpDetail();
+  renderEmployeeList();
+  renderOverview();
+  showToast(`✅ Đã xoá nhân viên ${empName}`, 'success');
+}
 
 async function addDeduction(empId) {
   const reason = prompt('Lý do trừ thưởng:');
