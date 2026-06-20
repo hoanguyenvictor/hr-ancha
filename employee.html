@@ -896,14 +896,11 @@ async function submitSupply() {
     showToast(hasAlert ? '⚠️ Đã lưu! Một số dụng cụ dưới mức — Boss đã được thông báo.' : '✅ Báo cáo kho đã lưu!', hasAlert ? 'warning' : 'success');
   }
 
-  // Reset toàn bộ form về 0
-  SUPPLY_ITEMS.forEach(item => {
-    const el = document.getElementById(`sup_${item.key}`);
-    if (el) el.value = '';
-  });
-  document.getElementById('supplyReminderCard').style.display = 'none';
+  // Reset form — xóa localStorage để renderSupply không điền lại
+  localStorage.removeItem(`supply_${today()}`);
   document.getElementById('supplyOnBehalf').checked = false;
   document.getElementById('onBehalfSelect').style.display = 'none';
+  renderSupply();
 }
 
 let currentReturnType = 'customer';
