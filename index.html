@@ -1258,23 +1258,55 @@ function switchPage(name, btn) {
 async function loadNotifications() {
   const el = document.getElementById('notifList');
   el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p>';
-  const res = await apiCall('getPendingSubmissions', {});
-  if (!res.ok || !res.data || res.data.length === 0) {
+  const [resChecklist, resReturns] = await Promise.all([
+    apiCall('getPendingSubmissions', {}),
+    apiCall('getPendingReturns', {}),
+  ]);
+  const checklists = resChecklist.ok && resChecklist.data ? resChecklist.data : [];
+  const returns = resReturns.ok && resReturns.data ? resReturns.data : [];
+  const total = checklists.length + returns.length;
+  if (total === 0) {
     el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px">🎉 Không có thông báo nào chờ xác nhận</p>';
     document.getElementById('notifBadge').classList.add('hidden');
     return;
   }
-  document.getElementById('notifBadge').textContent = res.data.length;
+  document.getElementById('notifBadge').textContent = total;
   document.getElementById('notifBadge').classList.remove('hidden');
-  el.innerHTML = res.data.map(s => `
+
+  const checklistHTML = checklists.map(s => `
     <div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
-      <div style="font-weight:700;font-size:0.95rem">👤 ${s.empName}</div>
+      <div style="font-size:0.72rem;color:var(--primary);font-weight:700;margin-bottom:4px">📋 CHECKLIST</div>
+      <div style="font-weight:700">👤 ${s.empName}</div>
       <div style="font-size:0.82rem;color:var(--muted);margin:4px 0">${s.date} · ${s.time} · ✅ ${s.doneTasks}/${s.totalTasks} việc</div>
       <div style="display:flex;gap:8px;margin-top:10px">
-        <button onclick="reviewSubmission('${s.id}','${s.empId}','${s.date}',true)" style="flex:1;padding:8px;background:var(--success);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">✅ Hoàn thành</button>
+        <button onclick="reviewSubmission('${s.id}','${s.empId}','${s.date}',true)" style="flex:1;padding:8px;background:var(--success);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">✅ Đạt</button>
         <button onclick="reviewSubmission('${s.id}','${s.empId}','${s.date}',false)" style="flex:1;padding:8px;background:var(--danger);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">❌ Không đạt (−50k)</button>
       </div>
     </div>`).join('');
+
+  const returnsHTML = returns.map(r => {
+    const isCustomer = r.type === 'customer';
+    const photos = [r.photoShipper, r.photoActual, r.photoQR, r.photoOrders, r.photoPancake].filter(Boolean);
+    const photoHTML = photos.map(url => `<a href="${url}" target="_blank"><img src="${url}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:1px solid var(--border)"></a>`).join('');
+    return `
+    <div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+      <div style="font-size:0.72rem;color:var(--warning);font-weight:700;margin-bottom:4px">${isCustomer ? '🔄 HOÀN — KHÁCH TRẢ' : '🚚 HOÀN — VẬN CHUYỂN'}</div>
+      <div style="font-weight:700">👤 ${r.empName} · 📅 ${r.date}</div>
+      ${isCustomer ? `<div style="font-size:0.85rem;margin:6px 0">📦 Đơn: <b>${r.orderId}</b> · 💰 <b>${Number(r.amount||0).toLocaleString('vi-VN')}đ</b></div><div style="font-size:0.82rem;color:var(--muted)">🏦 ${r.bankInfo}</div>` : `<div style="font-size:0.85rem;margin:6px 0">📦 Số đơn: <b>${r.count}</b></div><div style="font-size:0.78rem;color:var(--muted);white-space:pre-wrap">${r.orderIds||''}</div>`}
+      ${photos.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">${photoHTML}</div>` : ''}
+      ${isCustomer ? `
+      <div style="margin-top:8px">
+        <label style="font-size:0.8rem;color:var(--muted)">📷 Upload ảnh CK thành công cho khách:</label>
+        <input type="file" id="proof_${r.id}" accept="image/*" style="margin-top:4px;font-size:0.8rem;width:100%">
+      </div>` : ''}
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button onclick="confirmReturn('${r.id}','${r.empId}',${isCustomer})" style="flex:1;padding:8px;background:var(--success);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">✅ Xác nhận</button>
+        <button onclick="rejectReturn('${r.id}','${r.empId}')" style="flex:1;padding:8px;background:var(--danger);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">❌ Từ chối</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = checklistHTML + returnsHTML;
 }
 
 async function reviewSubmission(id, empId, date, approved) {
@@ -1285,9 +1317,38 @@ async function reviewSubmission(id, empId, date, approved) {
   }
 }
 
+function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function confirmReturn(id, empId, isCustomer) {
+  let proofUrl = '';
+  if (isCustomer) {
+    const file = document.getElementById(`proof_${id}`)?.files[0];
+    if (file) {
+      showToast('⏳ Đang tải ảnh CK lên...', 'info');
+      const b64 = (await toBase64(file)).split(',')[1];
+      const res = await apiCall('uploadPhoto', { empId, date: today(), type: 'return_proof', label: `Ảnh CK hoàn - ${id}`, base64: b64, mimeType: file.type });
+      proofUrl = res.ok ? res.url : '';
+    }
+  }
+  const res = await apiCall('confirmReturn', { id, empId, approved: true, proofUrl });
+  if (res.ok) { showToast('✅ Đã xác nhận — nhân viên sẽ nhận thông báo!', 'success'); loadNotifications(); }
+}
+
+async function rejectReturn(id, empId) {
+  const res = await apiCall('confirmReturn', { id, empId, approved: false, proofUrl: '' });
+  if (res.ok) { showToast('❌ Đã từ chối hoàn hàng!', 'warning'); loadNotifications(); }
+}
+
 async function updateNotifBadge() {
-  const res = await apiCall('getPendingSubmissions', {});
-  const count = res.ok && res.data ? res.data.length : 0;
+  const [r1, r2] = await Promise.all([apiCall('getPendingSubmissions', {}), apiCall('getPendingReturns', {})]);
+  const count = (r1.ok && r1.data ? r1.data.length : 0) + (r2.ok && r2.data ? r2.data.length : 0);
   const badge = document.getElementById('notifBadge');
   if (count > 0) { badge.textContent = count; badge.classList.remove('hidden'); }
   else badge.classList.add('hidden');

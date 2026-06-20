@@ -1398,21 +1398,44 @@ function switchPage(name, btn) {
 async function loadEmpNotifications() {
   const el = document.getElementById('empNotifList');
   el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p>';
-  const res = await apiCall('getMySubmissions', { empId: state.user.id });
-  if (!res.ok || !res.data || res.data.length === 0) {
+  const [resCheck, resReturn] = await Promise.all([
+    apiCall('getMySubmissions', { empId: state.user.id }),
+    apiCall('getMyReturns', { empId: state.user.id }),
+  ]);
+  const checklists = resCheck.ok && resCheck.data ? resCheck.data : [];
+  const returns = resReturn.ok && resReturn.data ? resReturn.data : [];
+  if (checklists.length === 0 && returns.length === 0) {
     el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px">Chưa có thông báo nào</p>';
     return;
   }
-  el.innerHTML = res.data.reverse().map(s => {
-    const approved = s.status === 'approved';
-    return `<div style="border-left:4px solid ${approved?'var(--success)':'var(--danger)'};padding:12px 14px;border-radius:0 10px 10px 0;background:${approved?'#f0fdf4':'#fff1f2'};margin-bottom:10px">
-      <div style="font-weight:700;color:${approved?'var(--success)':'var(--danger)'}">
-        ${approved ? '✅ Checklist đạt yêu cầu' : '❌ Checklist không đạt — bị trừ 50.000đ'}
+
+  const checkHTML = checklists.reverse().map(s => {
+    const ok = s.status === 'approved';
+    return `<div style="border-left:4px solid ${ok?'var(--success)':'var(--danger)'};padding:12px 14px;border-radius:0 10px 10px 0;background:${ok?'#f0fdf4':'#fff1f2'};margin-bottom:10px">
+      <div style="font-size:0.7rem;color:var(--muted);font-weight:700">📋 CHECKLIST</div>
+      <div style="font-weight:700;color:${ok?'var(--success)':'var(--danger)'}">
+        ${ok ? '✅ Boss xác nhận đạt yêu cầu' : '❌ Không đạt — bị trừ 50.000đ'}
       </div>
-      <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">📅 ${s.date} · ✅ ${s.doneTasks}/${s.totalTasks} việc · Boss xác nhận lúc ${s.reviewedAt}</div>
+      <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">📅 ${s.date} · ${s.doneTasks}/${s.totalTasks} việc</div>
     </div>`;
   }).join('');
+
+  const returnHTML = returns.reverse().map(r => {
+    const ok = r.status === 'confirmed';
+    const isCustomer = r.type === 'customer';
+    return `<div style="border-left:4px solid ${ok?'var(--success)':'var(--danger)'};padding:12px 14px;border-radius:0 10px 10px 0;background:${ok?'#f0fdf4':'#fff1f2'};margin-bottom:10px">
+      <div style="font-size:0.7rem;color:var(--muted);font-weight:700">${isCustomer?'🔄 HOÀN KHÁCH':'🚚 HOÀN VẬN CHUYỂN'}</div>
+      <div style="font-weight:700;color:${ok?'var(--success)':'var(--danger)'}">
+        ${ok ? '✅ Boss đã xác nhận hoàn tiền' : '❌ Boss từ chối — liên hệ Boss để xử lý'}
+      </div>
+      ${isCustomer ? `<div style="font-size:0.82rem;color:var(--muted);margin-top:4px">📦 Đơn: ${r.orderId} · 💰 ${Number(r.amount||0).toLocaleString('vi-VN')}đ</div>` : `<div style="font-size:0.82rem;color:var(--muted);margin-top:4px">📦 ${r.count} đơn · 📅 ${r.date}</div>`}
+      ${ok && r.proofUrl ? `<div style="margin-top:8px"><a href="${r.proofUrl}" target="_blank" download style="display:inline-block;padding:6px 12px;background:var(--primary);color:white;border-radius:8px;font-size:0.82rem;text-decoration:none">📥 Tải ảnh CK gửi khách</a></div>` : ''}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = checkHTML + returnHTML;
   document.getElementById('empNotifBadge').classList.add('hidden');
+  localStorage.setItem('empNotifSeen', String(checklists.length + returns.length));
 }
 
 async function updateEmpNotifBadge() {

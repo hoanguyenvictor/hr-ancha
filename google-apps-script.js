@@ -42,7 +42,8 @@ const SHEETS = {
   LOGS:        'Logs',
   SCHEDULE:    'Schedule',
   PHOTOS:      'Photos',
-  SUBMISSIONS: 'Submissions',
+  SUBMISSIONS:       'Submissions',
+  RETURN_SUBS:       'ReturnSubmissions',
 };
 
 // ─── ENTRY POINT (GET — tránh CORS) ──────────────────────────────
@@ -103,6 +104,9 @@ function doGet(e) {
       case 'getPendingSubmissions': result = getPendingSubmissions(data); break;
       case 'reviewSubmission':      result = reviewSubmission(data); break;
       case 'getMySubmissions':      result = getMySubmissions(data); break;
+      case 'getPendingReturns':     result = getPendingReturns(data); break;
+      case 'confirmReturn':         result = confirmReturn(data); break;
+      case 'getMyReturns':          result = getMyReturns(data); break;
       default: result = { ok: false, error: 'Unknown action: ' + action };
     }
 
@@ -147,7 +151,8 @@ function initSheet(sheet, name) {
     [SHEETS.SALARY]:     ['empId','month','salesBonus','confirmed','confirmedAt'],
     [SHEETS.PINGS]:       ['empId','date','time','responded'],
     [SHEETS.LOGS]:        ['ts','action','detail'],
-    [SHEETS.SUBMISSIONS]: ['id','empId','date','time','totalTasks','doneTasks','status','reviewedAt'],
+    [SHEETS.SUBMISSIONS]:  ['id','empId','date','time','totalTasks','doneTasks','status','reviewedAt'],
+    [SHEETS.RETURN_SUBS]: ['id','empId','date','time','type','orderId','amount','bankInfo','condition','photoShipper','photoActual','photoQR','count','orderIds','photoOrders','photoPancake','status','proofUrl','confirmedAt'],
   };
   if (headers[name]) sheet.getRange(1, 1, 1, headers[name].length).setValues([headers[name]]);
 }
@@ -434,13 +439,65 @@ function submitSupply(data) {
 }
 
 function submitReturn(data) {
-  const { empId, date, orderId, product, qty, condition } = data;
-  appendRow(SHEETS.RETURNS, {
-    empId, date, time: new Date().toTimeString().slice(0,5),
-    orderId, product, qty, condition
-  });
-  log('return', `${empId} - ${orderId} - ${product} x${qty} - ${condition}`);
+  const { empId, date, type } = data;
+  const id = `RET-${empId}-${Date.now()}`;
+  const time = new Date().toTimeString().slice(0,5);
+  const emps = sheetData(SHEETS.EMPLOYEES);
+  const emp = emps.find(e => e.id === empId);
+  const empName = emp ? emp.name : empId;
+
+  if (type === 'customer') {
+    const { orderId, amount, bankInfo, condition, photoShipper, photoActual, photoQR } = data;
+    appendRow(SHEETS.RETURN_SUBS, { id, empId, date, time, type, orderId, amount, bankInfo, condition, photoShipper: photoShipper||'', photoActual: photoActual||'', photoQR: photoQR||'', status: 'pending', proofUrl: '', confirmedAt: '' });
+    const condLabel = { ok: 'Nguyên vẹn', damaged: 'Hỏng', repack: 'Cần đóng gói lại' }[condition] || condition;
+    sendTelegram(`🔄 <b>Hàng hoàn — Khách trả</b>\n👤 ${empName} · 📅 ${date}\n📦 Đơn: <b>${orderId}</b>\n💰 Hoàn: <b>${Number(amount).toLocaleString('vi-VN')}đ</b>\n🏦 ${bankInfo}\n📋 Tình trạng: ${condLabel}\n\n👉 Boss Dashboard → 🔔 Thông Báo để xác nhận`);
+  } else {
+    const { count, orderIds, photoOrders, photoPancake } = data;
+    appendRow(SHEETS.RETURN_SUBS, { id, empId, date, time, type, count, orderIds, photoOrders: photoOrders||'', photoPancake: photoPancake||'', status: 'pending', proofUrl: '', confirmedAt: '' });
+    sendTelegram(`🚚 <b>Hàng hoàn — Vận chuyển</b>\n👤 ${empName} · 📅 ${date}\n📦 Số đơn: <b>${count}</b>\nMã đơn:\n${orderIds}\n\n👉 Boss Dashboard → 🔔 Thông Báo để xác nhận`);
+  }
+  log('return', `${empId} - ${type} - ${date}`);
   return { ok: true };
+}
+
+function getPendingReturns(data) {
+  const rows = sheetData(SHEETS.RETURN_SUBS).filter(r => r.status === 'pending');
+  const emps = sheetData(SHEETS.EMPLOYEES);
+  return { ok: true, data: rows.map(r => ({ ...r, empName: (emps.find(e => e.id === r.empId)||{}).name || r.empId })) };
+}
+
+function confirmReturn(data) {
+  const { id, empId, approved, proofUrl } = data;
+  const sheet = getSheet(SHEETS.RETURN_SUBS);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const idIdx = headers.indexOf('id');
+  const statusIdx = headers.indexOf('status');
+  const proofIdx = headers.indexOf('proofUrl');
+  const confirmedAtIdx = headers.indexOf('confirmedAt');
+  for (let i = 1; i < vals.length; i++) {
+    if (vals[i][idIdx] === id) {
+      sheet.getRange(i+1, statusIdx+1).setValue(approved ? 'confirmed' : 'rejected');
+      sheet.getRange(i+1, proofIdx+1).setValue(proofUrl || '');
+      sheet.getRange(i+1, confirmedAtIdx+1).setValue(new Date().toTimeString().slice(0,5));
+      break;
+    }
+  }
+  const emps = sheetData(SHEETS.EMPLOYEES);
+  const emp = emps.find(e => e.id === empId);
+  const empName = emp ? emp.name : empId;
+  if (approved) {
+    sendTelegram(`✅ <b>Boss đã xác nhận hoàn tiền</b>\n👤 ${empName}\nVào tab 🔔 Thông Báo để tải ảnh xác nhận gửi khách.`);
+  }
+  return { ok: true };
+}
+
+function getMyReturns(data) {
+  const { empId } = data;
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+  const rows = sheetData(SHEETS.RETURN_SUBS)
+    .filter(r => r.empId === empId && r.status !== 'pending' && new Date(r.date) >= cutoff);
+  return { ok: true, data: rows };
 }
 
 // ─── OVERTIME / SHIFTS ────────────────────────────────────────────
