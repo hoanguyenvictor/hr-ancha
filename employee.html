@@ -371,6 +371,13 @@
 </div>
 
 <!-- ── CÀI ĐẶT ───────────────────────────────────── -->
+<div class="page" id="page-emp-notifications">
+  <div class="card">
+    <div class="card-title"><span class="icon">🔔</span>Thông Báo Từ Boss</div>
+    <div id="empNotifList"><p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p></div>
+  </div>
+</div>
+
 <div class="page" id="page-settings">
   <div class="card">
     <div class="card-title"><span class="icon">👤</span>Thông Tin Tài Khoản</div>
@@ -422,6 +429,13 @@
   </button>
   <button class="nav-item" onclick="switchPage('salary',this)">
     <span class="icon">💰</span><span>Lương</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('emp-notifications',this)" id="empNotifNav">
+    <span style="position:relative;display:inline-block">
+      <span class="icon">🔔</span>
+      <span id="empNotifBadge" class="hidden" style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:white;border-radius:10px;padding:1px 5px;font-size:0.6rem;font-weight:700"></span>
+    </span>
+    <span>Thông Báo</span>
   </button>
   <button class="nav-item" onclick="switchPage('settings',this)">
     <span class="icon">⚙️</span><span>Cài Đặt</span>
@@ -526,6 +540,7 @@ async function init() {
   renderSupply();
   renderSalary();
   loadOvertimeList();
+  updateEmpNotifBadge();
 
   // Check ca tối đang chạy
   const shiftData = JSON.parse(localStorage.getItem('activeShift') || 'null');
@@ -1380,6 +1395,38 @@ function switchPage(name, btn) {
   if (name === 'overtime') renderSchedule();
   if (name === 'salary') renderSalary();
   if (name === 'settings') renderSettingsPage();
+  if (name === 'emp-notifications') loadEmpNotifications();
+}
+
+async function loadEmpNotifications() {
+  const el = document.getElementById('empNotifList');
+  el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p>';
+  const res = await apiCall('getMySubmissions', { empId: state.user.id });
+  if (!res.ok || !res.data || res.data.length === 0) {
+    el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px">Chưa có thông báo nào</p>';
+    return;
+  }
+  el.innerHTML = res.data.reverse().map(s => {
+    const approved = s.status === 'approved';
+    return `<div style="border-left:4px solid ${approved?'var(--success)':'var(--danger)'};padding:12px 14px;border-radius:0 10px 10px 0;background:${approved?'#f0fdf4':'#fff1f2'};margin-bottom:10px">
+      <div style="font-weight:700;color:${approved?'var(--success)':'var(--danger)'}">
+        ${approved ? '✅ Checklist đạt yêu cầu' : '❌ Checklist không đạt — bị trừ 50.000đ'}
+      </div>
+      <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">📅 ${s.date} · ✅ ${s.doneTasks}/${s.totalTasks} việc · Boss xác nhận lúc ${s.reviewedAt}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('empNotifBadge').classList.add('hidden');
+}
+
+async function updateEmpNotifBadge() {
+  if (!state.user) return;
+  const res = await apiCall('getMySubmissions', { empId: state.user.id });
+  const count = res.ok && res.data ? res.data.filter(s => s.status !== 'pending').length : 0;
+  const badge = document.getElementById('empNotifBadge');
+  const seen = Number(localStorage.getItem('empNotifSeen') || '0');
+  const unseen = count - seen;
+  if (unseen > 0) { badge.textContent = unseen; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
 }
 
 function renderSettingsPage() {

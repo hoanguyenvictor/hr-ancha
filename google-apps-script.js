@@ -102,6 +102,7 @@ function doGet(e) {
       case 'createSubmission':      result = createSubmission(data); break;
       case 'getPendingSubmissions': result = getPendingSubmissions(data); break;
       case 'reviewSubmission':      result = reviewSubmission(data); break;
+      case 'getMySubmissions':      result = getMySubmissions(data); break;
       default: result = { ok: false, error: 'Unknown action: ' + action };
     }
 
@@ -905,6 +906,15 @@ function setupDailyCleanup() {
 
 function dailyCleanup() {
   cleanOldPhotos();
+}
+
+function getMySubmissions(data) {
+  const { empId } = data;
+  const rows = sheetData(SHEETS.SUBMISSIONS).filter(r => r.empId === empId && r.status !== 'pending');
+  // Chỉ trả 30 ngày gần nhất
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+  const recent = rows.filter(r => new Date(r.date) >= cutoff);
+  return { ok: true, data: recent };
 }
 
 // ─── SUBMISSIONS (Checklist confirmation) ─────────────────────────
