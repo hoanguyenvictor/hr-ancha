@@ -801,7 +801,8 @@ async function submitChecklist() {
 
   state.todayData.checklist = state.checklistState;
   localStorage.setItem(`todayData_${today()}`, JSON.stringify(state.todayData));
-  showToast(`✅ Đã gửi ${doneTasks.length}/${allTasks.length} việc cho Boss!`, 'success');
+  await apiCall('createSubmission', { empId: state.user.id, date: today(), totalTasks: allTasks.length, doneTasks: doneTasks.length });
+  showToast(`✅ Đã gửi ${doneTasks.length}/${allTasks.length} việc — chờ Boss xác nhận!`, 'success');
   renderHome();
 }
 

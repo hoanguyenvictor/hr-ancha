@@ -30,18 +30,19 @@ function sendTelegram(msg) {
 
 // Tên các sheet (tab)
 const SHEETS = {
-  EMPLOYEES: 'Employees',
-  CHECKIN:   'Checkin',
-  CHECKLIST: 'Checklist',
-  SUPPLY:    'Supply',
-  OVERTIME:  'Overtime',
-  RETURNS:   'Returns',
-  DEDUCTIONS:'Deductions',
-  SALARY:    'Salary',
-  PINGS:     'Pings',
-  LOGS:      'Logs',
-  SCHEDULE:  'Schedule',
-  PHOTOS:    'Photos',
+  EMPLOYEES:   'Employees',
+  CHECKIN:     'Checkin',
+  CHECKLIST:   'Checklist',
+  SUPPLY:      'Supply',
+  OVERTIME:    'Overtime',
+  RETURNS:     'Returns',
+  DEDUCTIONS:  'Deductions',
+  SALARY:      'Salary',
+  PINGS:       'Pings',
+  LOGS:        'Logs',
+  SCHEDULE:    'Schedule',
+  PHOTOS:      'Photos',
+  SUBMISSIONS: 'Submissions',
 };
 
 // ─── ENTRY POINT (GET — tránh CORS) ──────────────────────────────
@@ -97,7 +98,10 @@ function doGet(e) {
       case 'editSchedule':        result = editSchedule(data); break;
       case 'savePenalties':       result = savePenalties(data); break;
       case 'getPenalties':        result = getPenalties(data); break;
-      case 'changePassword':      result = changePassword(data); break;
+      case 'changePassword':        result = changePassword(data); break;
+      case 'createSubmission':      result = createSubmission(data); break;
+      case 'getPendingSubmissions': result = getPendingSubmissions(data); break;
+      case 'reviewSubmission':      result = reviewSubmission(data); break;
       default: result = { ok: false, error: 'Unknown action: ' + action };
     }
 
@@ -140,8 +144,9 @@ function initSheet(sheet, name) {
     [SHEETS.PHOTOS]:     ['empId','date','time','type','label','url','driveId','expires'],
     [SHEETS.DEDUCTIONS]: ['empId','month','date','reason','amount'],
     [SHEETS.SALARY]:     ['empId','month','salesBonus','confirmed','confirmedAt'],
-    [SHEETS.PINGS]:      ['empId','date','time','responded'],
-    [SHEETS.LOGS]:       ['ts','action','detail'],
+    [SHEETS.PINGS]:       ['empId','date','time','responded'],
+    [SHEETS.LOGS]:        ['ts','action','detail'],
+    [SHEETS.SUBMISSIONS]: ['id','empId','date','time','totalTasks','doneTasks','status','reviewedAt'],
   };
   if (headers[name]) sheet.getRange(1, 1, 1, headers[name].length).setValues([headers[name]]);
 }
@@ -900,4 +905,52 @@ function setupDailyCleanup() {
 
 function dailyCleanup() {
   cleanOldPhotos();
+}
+
+// ─── SUBMISSIONS (Checklist confirmation) ─────────────────────────
+function createSubmission(data) {
+  const { empId, date, totalTasks, doneTasks } = data;
+  const id = `SUB-${empId}-${date}-${Date.now()}`;
+  appendRow(SHEETS.SUBMISSIONS, { id, empId, date, time: new Date().toTimeString().slice(0,5), totalTasks, doneTasks, status: 'pending', reviewedAt: '' });
+  const emps = sheetData(SHEETS.EMPLOYEES);
+  const emp = emps.find(e => e.id === empId);
+  const empName = emp ? emp.name : empId;
+  sendTelegram(`📋 <b>Checklist cần xác nhận</b>\n👤 ${empName}\n📅 ${date}\n✅ Hoàn thành: <b>${doneTasks}/${totalTasks}</b> việc\n\n👉 Vào Boss Dashboard → 🔔 Thông Báo để xác nhận`);
+  return { ok: true };
+}
+
+function getPendingSubmissions(data) {
+  const rows = sheetData(SHEETS.SUBMISSIONS).filter(r => r.status === 'pending');
+  const emps = sheetData(SHEETS.EMPLOYEES);
+  const result = rows.map(r => {
+    const emp = emps.find(e => e.id === r.empId);
+    return { ...r, empName: emp ? emp.name : r.empId };
+  });
+  return { ok: true, data: result };
+}
+
+function reviewSubmission(data) {
+  const { id, approved, empId, date } = data;
+  const sheet = getSheet(SHEETS.SUBMISSIONS);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const idIdx = headers.indexOf('id');
+  const statusIdx = headers.indexOf('status');
+  const reviewedAtIdx = headers.indexOf('reviewedAt');
+  for (let i = 1; i < vals.length; i++) {
+    if (vals[i][idIdx] === id) {
+      sheet.getRange(i+1, statusIdx+1).setValue(approved ? 'approved' : 'rejected');
+      sheet.getRange(i+1, reviewedAtIdx+1).setValue(new Date().toTimeString().slice(0,5));
+      break;
+    }
+  }
+  if (!approved) {
+    const month = date.slice(0,7);
+    appendRow(SHEETS.DEDUCTIONS, { empId, month, date, reason: 'Checklist không hoàn thành', amount: 50000 });
+    const emps = sheetData(SHEETS.EMPLOYEES);
+    const emp = emps.find(e => e.id === empId);
+    const empName = emp ? emp.name : empId;
+    sendTelegram(`⚠️ <b>Checklist không đạt</b>\n👤 ${empName} bị trừ <b>50.000đ</b>\n📅 ${date}`);
+  }
+  return { ok: true };
 }
