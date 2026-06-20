@@ -451,6 +451,23 @@ function submitReturn(data) {
     appendRow(SHEETS.RETURN_SUBS, { id, empId, date, time, type, orderId, amount, bankInfo, condition, photoShipper: photoShipper||'', photoActual: photoActual||'', photoQR: photoQR||'', status: 'pending', proofUrl: '', confirmedAt: '' });
     const condLabel = { ok: 'Nguyên vẹn', damaged: 'Hỏng', repack: 'Cần đóng gói lại' }[condition] || condition;
     sendTelegram(`🔄 <b>Hàng hoàn — Khách trả</b>\n👤 ${empName} · 📅 ${date}\n📦 Đơn: <b>${orderId}</b>\n💰 Hoàn: <b>${Number(amount).toLocaleString('vi-VN')}đ</b>\n🏦 ${bankInfo}\n📋 Tình trạng: ${condLabel}\n\n👉 Boss Dashboard → 🔔 Thông Báo để xác nhận`);
+    // Gửi từng ảnh riêng để Boss quét QR và kiểm tra
+    const photos = [
+      { url: photoQR, cap: `🔳 Mã QR khách hoàn — ĐH ${orderId}` },
+      { url: photoShipper, cap: `📋 Ảnh shipper giao — ĐH ${orderId}` },
+      { url: photoActual, cap: `📷 Ảnh hàng thực tế — ĐH ${orderId}` },
+    ];
+    photos.forEach(p => {
+      if (p.url) {
+        try {
+          UrlFetchApp.fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendPhoto`, {
+            method: 'post',
+            contentType: 'application/json',
+            payload: JSON.stringify({ chat_id: TG_CHAT_ID, photo: p.url, caption: p.cap })
+          });
+        } catch(e) {}
+      }
+    });
   } else {
     const { count, orderIds, photoOrders, photoPancake } = data;
     appendRow(SHEETS.RETURN_SUBS, { id, empId, date, time, type, count, orderIds, photoOrders: photoOrders||'', photoPancake: photoPancake||'', status: 'pending', proofUrl: '', confirmedAt: '' });

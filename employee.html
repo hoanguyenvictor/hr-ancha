@@ -946,11 +946,15 @@ async function submitReturnCustomer() {
   await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'customer',
     orderId, amount, bankInfo, condition, photoShipper: urlShipper, photoActual: urlActual, photoQR: urlQR });
   showToast('✅ Đã ghi nhận! Boss sẽ xem xét và hoàn tiền cho khách.', 'success');
-  document.getElementById('r1_orderId').value = '';
-  document.getElementById('r1_amount').value = '';
-  document.getElementById('r1_bankInfo').value = '';
-  document.getElementById('r1_qrPhoto').value = '';
+  // Reset toàn bộ form khách trả
+  ['r1_orderId','r1_amount','r1_bankInfo','r1_qrPhoto','r1_photoShipper','r1_photoActual'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
   document.getElementById('r1_qrPreviewArea').innerHTML = '<div style="font-size:1.5rem">🔳</div><div style="font-size:0.82rem;color:var(--muted);margin-top:4px">Chụp hoặc chọn ảnh mã QR</div>';
+  ['r1_photoShipperPreview','r1_photoActualPreview'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.src = ''; el.classList.add('hidden'); }
+  });
 }
 
 async function submitReturnCarrier() {
@@ -977,8 +981,13 @@ async function submitReturnCarrier() {
   await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'carrier',
     count, orderIds, photoOrders: urlOrders, photoPancake: urlPancake });
   showToast('✅ Đã ghi nhận hàng vận chuyển hoàn về!', 'success');
-  document.getElementById('r2_count').value = '';
-  document.getElementById('r2_orderIds').value = '';
+  ['r2_count','r2_orderIds','r2_photoOrders','r2_photoPancake'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  ['r2_photoOrdersPreview','r2_photoPancakePreview'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.src = ''; el.classList.add('hidden'); }
+  });
 }
 
 // ─── EVENING SHIFT ─────────────────────────────────────
