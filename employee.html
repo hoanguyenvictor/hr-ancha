@@ -378,6 +378,18 @@
   </div>
 </div>
 
+<div class="page" id="page-diary">
+  <div class="card">
+    <div class="card-title"><span class="icon">📅</span>Nhật Ký Công Việc</div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      <button onclick="setDiaryFilter('day')" id="dfilter-day" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--primary);background:var(--primary);color:white;font-weight:700;cursor:pointer;font-size:0.82rem">Hôm nay</button>
+      <button onclick="setDiaryFilter('week')" id="dfilter-week" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);color:var(--text);font-weight:600;cursor:pointer;font-size:0.82rem">Tuần này</button>
+      <button onclick="setDiaryFilter('month')" id="dfilter-month" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);color:var(--text);font-weight:600;cursor:pointer;font-size:0.82rem">Tháng này</button>
+    </div>
+    <div id="empDiaryList"><p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px">Đang tải...</p></div>
+  </div>
+</div>
+
 <div class="page" id="page-settings">
   <div class="card">
     <div class="card-title"><span class="icon">👤</span>Thông Tin Tài Khoản</div>
@@ -424,8 +436,8 @@
   <button class="nav-item" onclick="switchPage('inventory',this)">
     <span class="icon">📦</span><span>Kho</span>
   </button>
-  <button class="nav-item" onclick="switchPage('overtime',this)">
-    <span class="icon">📅</span><span>Lịch</span>
+  <button class="nav-item" onclick="switchPage('diary',this)">
+    <span class="icon">📅</span><span>Nhật Ký</span>
   </button>
   <button class="nav-item" onclick="switchPage('salary',this)">
     <span class="icon">💰</span><span>Lương</span>
@@ -1391,13 +1403,102 @@ function switchPage(name, btn) {
   document.getElementById(`page-${name}`).classList.add('active');
   if (btn) btn.classList.add('active');
   else {
-    const navBtns = { home: 0, checklist: 1, inventory: 2, overtime: 3, salary: 4, settings: 5 };
+    const navBtns = { home: 0, checklist: 1, inventory: 2, diary: 3, salary: 4, settings: 5 };
     document.querySelectorAll('.nav-item')[navBtns[name] ?? 0].classList.add('active');
   }
-  if (name === 'overtime') renderSchedule();
   if (name === 'salary') renderSalary();
   if (name === 'settings') renderSettingsPage();
   if (name === 'emp-notifications') loadEmpNotifications();
+  if (name === 'diary') { window._diaryFilter = window._diaryFilter || 'day'; loadEmpDiary(); }
+}
+
+// ─── NHẬT KÝ NHÂN VIÊN ────────────────────────────────────
+let _diaryFilter = 'day';
+
+function setDiaryFilter(f) {
+  _diaryFilter = f;
+  ['day','week','month'].forEach(k => {
+    const btn = document.getElementById(`dfilter-${k}`);
+    if (!btn) return;
+    if (k === f) { btn.style.background = 'var(--primary)'; btn.style.color = 'white'; btn.style.borderColor = 'var(--primary)'; }
+    else { btn.style.background = 'var(--card)'; btn.style.color = 'var(--text)'; btn.style.borderColor = 'var(--border)'; }
+  });
+  loadEmpDiary();
+}
+
+async function loadEmpDiary() {
+  const el = document.getElementById('empDiaryList');
+  if (!el) return;
+  el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px">Đang tải...</p>';
+
+  const now = new Date();
+  let dates = [];
+  if (_diaryFilter === 'day') {
+    dates = [today()];
+  } else if (_diaryFilter === 'week') {
+    const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+    for (let i = dow; i >= 0; i--) {
+      const d = new Date(now); d.setDate(now.getDate() - i);
+      dates.push(d.toISOString().slice(0,10));
+    }
+  } else {
+    const y = now.getFullYear(), m = now.getMonth();
+    const days = new Date(y, m+1, 0).getDate();
+    for (let d = 1; d <= now.getDate(); d++) {
+      dates.push(`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+    }
+  }
+  dates = dates.reverse();
+
+  const [resCheckin, resSubmissions, resSupply, resReturns] = await Promise.all([
+    apiCall('getMyCheckin', { empId: state.user.id }),
+    apiCall('getMySubmissions', { empId: state.user.id }),
+    apiCall('getMySupply', { empId: state.user.id }),
+    apiCall('getMyReturns', { empId: state.user.id }),
+  ]);
+
+  const checkins    = resCheckin.ok    ? (resCheckin.data    || []) : [];
+  const submissions = resSubmissions.ok ? (resSubmissions.data || []) : [];
+  const supplies    = resSupply.ok     ? (resSupply.data     || []) : [];
+  const returns_    = resReturns.ok    ? (resReturns.data    || []) : [];
+
+  const html = dates.map(date => {
+    const ci = checkins.filter(r => r.date === date);
+    const checkin  = ci.find(r => r.type === 'in' || r.shift);
+    const checkout = ci.find(r => r.type === 'out');
+    const sub   = submissions.find(r => r.date === date);
+    const sup   = supplies.find(r => r.date === date);
+    const rets  = returns_.filter(r => r.date === date);
+
+    const isToday = date === today();
+    const label = isToday ? `Hôm nay — ${date}` : date;
+
+    const row = (icon, title, value, color) =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:0.83rem">${icon} ${title}</span>
+        <span style="font-size:0.82rem;font-weight:700;color:${color}">${value}</span>
+      </div>`;
+
+    const ciVal  = checkin  ? `✅ ${checkin.checkIn || checkin.time || ''}` : '❌ Chưa check-in';
+    const coVal  = checkout ? `✅ ${checkout.time || ''}` : (checkin ? '⏳ Chưa check-out' : '—');
+    const clVal  = sub ? (sub.status === 'approved' ? `✅ Đạt (${sub.doneTasks}/${sub.totalTasks})` : sub.status === 'rejected' ? `❌ Không đạt` : `⏳ Chờ Boss xác nhận (${sub.doneTasks}/${sub.totalTasks})`) : '— Chưa gửi';
+    const supVal = sup ? `✅ Đã kiểm kho` : '— Không có';
+    const retVal = rets.length ? rets.map(r => {
+      const st = r.status === 'confirmed' ? '✅' : r.status === 'rejected' ? '❌' : '⏳';
+      return `${st} ${r.type === 'customer' ? 'Khách trả' : 'VC'} ${r.orderId || r.count + ' đơn'}`;
+    }).join('<br>') : '— Không có';
+
+    return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:0.88rem;margin-bottom:8px;color:var(--primary)">${isToday ? '🟢 ' : '📅 '}${label}</div>
+      ${row('🕐','Check-in', ciVal, checkin ? 'var(--success)' : 'var(--danger)')}
+      ${row('🕔','Check-out', coVal, checkout ? 'var(--success)' : 'var(--muted)')}
+      ${row('✅','Checklist', clVal, sub?.status === 'approved' ? 'var(--success)' : sub?.status === 'rejected' ? 'var(--danger)' : 'var(--warning)')}
+      ${row('📦','Kiểm kho', supVal, sup ? 'var(--success)' : 'var(--muted)')}
+      <div style="padding:5px 0"><div style="font-size:0.83rem">🔄 Hoàn hàng:</div><div style="font-size:0.82rem;font-weight:700;margin-top:2px;line-height:1.6">${retVal}</div></div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = html || '<p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px">Không có dữ liệu</p>';
 }
 
 async function loadEmpNotifications() {

@@ -120,6 +120,12 @@ function doGet(e) {
       case 'getPendingSubmissions': result = getPendingSubmissions(data); break;
       case 'reviewSubmission':      result = reviewSubmission(data); break;
       case 'getMySubmissions':      result = getMySubmissions(data); break;
+      case 'getMyCheckin':          result = getMyCheckin(data); break;
+      case 'getMySupply':           result = getMySupply(data); break;
+      case 'getAllCheckin':          result = { ok: true, data: sheetData(SHEETS.CHECKIN) }; break;
+      case 'getAllSubmissions':      result = { ok: true, data: sheetData(SHEETS.SUBMISSIONS) }; break;
+      case 'getAllSupply':           result = { ok: true, data: sheetData(SHEETS.SUPPLY) }; break;
+      case 'getAllReturns':          result = { ok: true, data: sheetData(SHEETS.RETURN_SUBS) }; break;
       case 'getPendingReturns':     result = getPendingReturns(data); break;
       case 'confirmReturn':         result = confirmReturn(data); break;
       case 'getMyReturns':          result = getMyReturns(data); break;
@@ -1025,11 +1031,23 @@ function dailyCleanup() {
 
 function getMySubmissions(data) {
   const { empId } = data;
-  const rows = sheetData(SHEETS.SUBMISSIONS).filter(r => r.empId === empId && r.status !== 'pending');
-  // Chỉ trả 30 ngày gần nhất
+  const rows = sheetData(SHEETS.SUBMISSIONS).filter(r => r.empId === empId);
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-  const recent = rows.filter(r => new Date(r.date) >= cutoff);
-  return { ok: true, data: recent };
+  return { ok: true, data: rows.filter(r => new Date(r.date) >= cutoff) };
+}
+
+function getMyCheckin(data) {
+  const { empId } = data;
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+  const rows = sheetData(SHEETS.CHECKIN).filter(r => r.empId === empId && new Date(r.date) >= cutoff);
+  return { ok: true, data: rows };
+}
+
+function getMySupply(data) {
+  const { empId } = data;
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+  const rows = sheetData(SHEETS.SUPPLY).filter(r => r.empId === empId && new Date(r.date) >= cutoff);
+  return { ok: true, data: rows };
 }
 
 // ─── SUBMISSIONS (Checklist confirmation) ─────────────────────────

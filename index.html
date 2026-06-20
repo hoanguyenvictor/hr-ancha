@@ -283,6 +283,19 @@
   </div>
 </div>
 
+<!-- ── NHẬT KÝ ─────────────────────────────────────── -->
+<div class="page" id="page-diary">
+  <div class="card">
+    <div class="card-title"><span class="icon">📅</span>Nhật Ký Toàn Đội</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      <button onclick="setBossDiaryFilter('day')" id="bdfilter-day" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--primary);background:var(--primary);color:white;font-weight:700;cursor:pointer;font-size:0.82rem">Hôm nay</button>
+      <button onclick="setBossDiaryFilter('week')" id="bdfilter-week" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);color:var(--text);font-weight:600;cursor:pointer;font-size:0.82rem">Tuần này</button>
+      <button onclick="setBossDiaryFilter('month')" id="bdfilter-month" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);color:var(--text);font-weight:600;cursor:pointer;font-size:0.82rem">Tháng này</button>
+    </div>
+    <div id="bossDiaryList"><p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px">Đang tải...</p></div>
+  </div>
+</div>
+
 <!-- ── CÀI ĐẶT ────────────────────────────────────── -->
 <div class="page" id="page-notifications">
   <div class="card">
@@ -373,6 +386,9 @@
   </button>
   <button class="nav-item" onclick="switchPage('schedule',this)">
     <span class="icon">📅</span><span>Lịch</span>
+  </button>
+  <button class="nav-item" onclick="switchPage('diary',this)">
+    <span class="icon">📅</span><span>Nhật Ký</span>
   </button>
   <button class="nav-item" onclick="switchPage('notifications',this)" id="navNotif">
     <span class="icon">🔔</span><span>Thông Báo</span>
@@ -1245,13 +1261,103 @@ function switchPage(name, btn) {
   document.getElementById(`page-${name}`).classList.add('active');
   if (btn) btn.classList.add('active');
   else {
-    const idx = { overview:0, employees:1, overtime:2, salary:3, schedule:4, photos:5, settings:6 };
+    const idx = { overview:0, employees:1, overtime:2, salary:3, schedule:4, diary:5, notifications:6, photos:7, settings:8 };
     document.querySelectorAll('.nav-item')[idx[name]??0].classList.add('active');
   }
   if (name === 'salary') renderSalaryTab();
   if (name === 'schedule') renderScheduleTab();
   if (name === 'photos') renderPhotosTab();
   if (name === 'notifications') loadNotifications();
+  if (name === 'diary') { window._bossDiaryFilter = window._bossDiaryFilter || 'day'; loadBossDiary(); }
+}
+
+// ─── NHẬT KÝ TOÀN ĐỘI ────────────────────────────────────
+let _bossDiaryFilter = 'day';
+
+function setBossDiaryFilter(f) {
+  _bossDiaryFilter = f;
+  ['day','week','month'].forEach(k => {
+    const btn = document.getElementById(`bdfilter-${k}`);
+    if (!btn) return;
+    if (k === f) { btn.style.background='var(--primary)'; btn.style.color='white'; btn.style.borderColor='var(--primary)'; }
+    else { btn.style.background='var(--card)'; btn.style.color='var(--text)'; btn.style.borderColor='var(--border)'; }
+  });
+  loadBossDiary();
+}
+
+async function loadBossDiary() {
+  const el = document.getElementById('bossDiaryList');
+  if (!el) return;
+  el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px">Đang tải...</p>';
+
+  const now = new Date();
+  let dates = [];
+  if (_bossDiaryFilter === 'day') {
+    dates = [today()];
+  } else if (_bossDiaryFilter === 'week') {
+    const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
+    for (let i = dow; i >= 0; i--) { const d = new Date(now); d.setDate(now.getDate()-i); dates.push(d.toISOString().slice(0,10)); }
+  } else {
+    const y = now.getFullYear(), m = now.getMonth();
+    for (let d = 1; d <= now.getDate(); d++) dates.push(`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+  }
+  dates = dates.reverse();
+
+  const [resEmps, resCheckin, resSubs, resSup, resRets] = await Promise.all([
+    apiCall('getEmployees', {}),
+    apiCall('getAllCheckin', {}),
+    apiCall('getAllSubmissions', {}),
+    apiCall('getAllSupply', {}),
+    apiCall('getAllReturns', {}),
+  ]);
+
+  const emps     = resEmps.ok     ? (resEmps.data     || []) : [];
+  const checkins = resCheckin.ok  ? (resCheckin.data  || []) : [];
+  const subs     = resSubs.ok     ? (resSubs.data     || []) : [];
+  const supplies = resSup.ok      ? (resSup.data      || []) : [];
+  const returns_ = resRets.ok     ? (resRets.data     || []) : [];
+
+  const tick = (v, ok, pending) => ok ? `<span style="color:var(--success);font-weight:700">${v}</span>` : pending ? `<span style="color:var(--warning)">${v}</span>` : `<span style="color:var(--danger)">${v}</span>`;
+
+  const html = dates.map(date => {
+    const isToday = date === today();
+    const empRows = emps.filter(e => e.role !== 'boss').map(emp => {
+      const ci = checkins.filter(r => r.empId === emp.id && r.date === date);
+      const checkin  = ci.find(r => r.type === 'in' || r.checkIn);
+      const checkout = ci.find(r => r.type === 'out' || r.checkOut);
+      const sub = subs.find(r => r.empId === emp.id && r.date === date);
+      const sup = supplies.find(r => r.empId === emp.id && r.date === date);
+      const rets = returns_.filter(r => r.empId === emp.id && r.date === date);
+
+      const ciIcon  = checkin  ? '✅' : '❌';
+      const coIcon  = checkout ? '✅' : (checkin ? '⏳' : '❌');
+      const clIcon  = !sub ? '—' : sub.status==='approved' ? '✅' : sub.status==='rejected' ? '❌' : '⏳';
+      const clLabel = !sub ? 'Chưa gửi' : sub.status==='approved' ? `Đạt (${sub.doneTasks}/${sub.totalTasks})` : sub.status==='rejected' ? 'Không đạt' : `Chờ xác nhận (${sub.doneTasks}/${sub.totalTasks})`;
+      const supIcon = sup ? '✅' : '—';
+      const retSummary = rets.length ? rets.map(r => {
+        const icon = r.status==='confirmed'?'✅':r.status==='rejected'?'❌':'⏳';
+        return `${icon} ${r.type==='customer'?'Khách':'VC'}`;
+      }).join(' · ') : '—';
+
+      return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">
+        <div style="font-weight:700;font-size:0.85rem;margin-bottom:6px">👤 ${emp.name}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.8rem">
+          <div>🕐 Check-in: ${ciIcon} ${checkin ? (checkin.checkIn||checkin.time||'') : 'Chưa'}</div>
+          <div>🕔 Check-out: ${coIcon} ${checkout ? (checkout.checkOut||checkout.time||'') : (checkin?'Chưa':'—')}</div>
+          <div>✅ Checklist: ${clIcon} ${clLabel}</div>
+          <div>📦 Kho: ${supIcon} ${sup?'Đã kiểm':'Không có'}</div>
+        </div>
+        ${rets.length ? `<div style="font-size:0.8rem;margin-top:4px">🔄 Hoàn hàng: ${retSummary}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    return `<div style="margin-bottom:16px">
+      <div style="font-weight:700;font-size:0.9rem;color:var(--primary);padding:6px 0;border-bottom:2px solid var(--primary);margin-bottom:8px">${isToday?'🟢 Hôm nay — ':'📅 '}${date}</div>
+      ${empRows || '<p style="font-size:0.82rem;color:var(--muted);padding:8px">Không có nhân viên</p>'}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = html || '<p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px">Không có dữ liệu</p>';
 }
 
 // ─── NOTIFICATIONS ─────────────────────────────────────
