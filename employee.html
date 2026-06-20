@@ -1410,9 +1410,7 @@ function logoutEmployee() {
 // ─── PWA ───────────────────────────────────────────────
 if ('serviceWorker' in navigator) {
   caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
-  navigator.serviceWorker.getRegistrations().then(regs => {
-    regs.forEach(r => r.unregister());
-  }).then(() => navigator.serviceWorker.register('sw.js')).catch(()=>{});
+  navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
 }
 
 init();
