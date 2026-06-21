@@ -707,8 +707,14 @@ function showAlertDetail() {
 function buildAlerts() {
   const alerts = [];
   const hour = new Date().getHours();
+  // Lấy thứ hôm nay để tra lịch
+  const todayDayKey = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
   employees.forEach(emp => {
     const r = todayReports[emp.id] || {};
+    // Bỏ qua nếu nhân viên đăng ký nghỉ hôm nay
+    const empSched = (weeklySchedule[emp.id] || {})[todayDayKey] || {};
+    const shift = empSched.shift || 'fullday';
+    if (shift === 'off') return;
     if (!r.checkin && hour >= 9) {
       alerts.push({ type: 'danger', title: `${emp.name} chưa check-in`, desc: `Đã ${hour}h mà chưa vào làm`, empId: emp.id });
     }
