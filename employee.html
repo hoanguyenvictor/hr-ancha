@@ -1394,15 +1394,17 @@ function buildScheduleForm() {
         <div style="display:flex;gap:8px;margin-bottom:6px">
           <div style="flex:1"><label style="font-size:0.78rem;color:var(--muted)">Từ giờ</label>
             <input type="time" id="eStart_${DAY_KEYS[i]}" value="19:30" min="00:00" max="23:59"
-              style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd"></div>
+              style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd"
+              oninput="calcOTHours('${DAY_KEYS[i]}')"></div>
           <div style="flex:1"><label style="font-size:0.78rem;color:var(--muted)">Đến giờ</label>
             <input type="time" id="eEnd_${DAY_KEYS[i]}" value="22:00" min="00:00" max="23:59"
-              style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd"></div>
+              style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd"
+              oninput="calcOTHours('${DAY_KEYS[i]}')"></div>
         </div>
-        <label style="font-size:0.78rem;color:var(--muted)">Số giờ dự kiến</label>
-        <select id="eHours_${DAY_KEYS[i]}" style="width:100%;padding:6px;border-radius:6px;border:1px solid #ddd;font-size:0.85rem;margin-bottom:6px">
-          ${[1,2,3,4,5,6,7,8].map(h=>`<option value="${h}"${h===2?' selected':''}>${h} tiếng</option>`).join('')}
-        </select>
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f8fafc;border-radius:8px;margin-bottom:6px">
+          <span style="font-size:0.78rem;color:var(--muted)">Số giờ tự động:</span>
+          <span id="eHours_${DAY_KEYS[i]}" style="font-weight:700;color:var(--primary);font-size:0.95rem">2.5 tiếng</span>
+        </div>
         <div style="font-size:0.78rem;${holiday?'color:#ef4444;font-weight:600':'color:var(--muted)'}">
           ${holiday?'🎌 Ngày lễ — ':''} Lương ngoài giờ: ${formatVND(otRate)}/giờ
         </div>
@@ -1414,6 +1416,21 @@ function buildScheduleForm() {
 function toggleEveningInputs(dayKey) {
   const checked = document.getElementById(`hasOT_${dayKey}`).checked;
   document.getElementById(`eveningInputs_${dayKey}`).style.display = checked ? 'block' : 'none';
+  if (checked) calcOTHours(dayKey);
+}
+
+function calcOTHours(dayKey) {
+  const s = document.getElementById(`eStart_${dayKey}`)?.value;
+  const e = document.getElementById(`eEnd_${dayKey}`)?.value;
+  const el = document.getElementById(`eHours_${dayKey}`);
+  if (!s || !e || !el) return;
+  const [sh, sm] = s.split(':').map(Number);
+  const [eh, em] = e.split(':').map(Number);
+  let diff = (eh * 60 + em) - (sh * 60 + sm);
+  if (diff <= 0) { el.textContent = '—'; return; }
+  const hours = Math.round(diff / 30) / 2; // làm tròn 0.5h
+  el.textContent = `${hours} tiếng`;
+  el.dataset.value = hours;
 }
 
 async function submitSchedule() {
@@ -1426,7 +1443,7 @@ async function submitSchedule() {
     if (hasOT) {
       schedule[key].eveningStart = document.getElementById(`eStart_${key}`)?.value || '19:30';
       schedule[key].eveningEnd   = document.getElementById(`eEnd_${key}`)?.value || '22:00';
-      schedule[key].plannedHours = Number(document.getElementById(`eHours_${key}`)?.value || 2);
+      schedule[key].plannedHours = Number(document.getElementById(`eHours_${key}`)?.dataset?.value || 2.5);
     }
   });
   const weekStart = weekKey(nextDates);

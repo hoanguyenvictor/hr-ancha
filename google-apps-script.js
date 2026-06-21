@@ -19,6 +19,72 @@ const TG_TOKEN = '8847651571:AAHPzHQ1eAY6nzztrBoHiSBUnjoTqfDDnYU';
 const TG_CHAT_ID = '7094454303';
 
 // ─── DAILY ATTENDANCE CHECK — chạy tự động 23h30 mỗi ngày ──────────
+// ─── NHẮC ĐĂNG KÝ LỊCH — chạy 15h, 19h, 22h Chủ Nhật ──
+function remindScheduleRegistration() {
+  const tz = Session.getScriptTimeZone();
+  const now = new Date();
+  if (now.getDay() !== 0) return; // chỉ chạy Chủ Nhật
+  const weekStart = getNextWeekStart(); // Thứ 2 tới
+  const employees = sheetData(SHEETS.EMPLOYEES).filter(e => e.role !== 'boss' && e.id);
+  const registered = sheetData(SHEETS.SCHEDULE).filter(r => r.weekStart === weekStart).map(r => String(r.empId));
+  const unregistered = employees.filter(e => !registered.includes(String(e.id)));
+  if (unregistered.length === 0) return;
+  const names = unregistered.map(e => e.name).join(', ');
+  const hour = now.getHours();
+  const urgency = hour >= 22 ? '🔴 Còn ít thời gian!' : hour >= 19 ? '🟡 Nhắc lần 2' : '🟢 Nhắc lần 1';
+  // Ghi thông báo vào EmpNotifications cho từng bạn chưa đăng ký
+  const date = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+  unregistered.forEach(emp => {
+    pushEmpNotification(emp.id, date, 'schedule_remind',
+      `⏰ ${urgency} — Bạn chưa đăng ký lịch làm tuần tới. Cổng đóng lúc 23h30 tối nay!`);
+  });
+}
+
+function getNextWeekStart() {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun
+  const diff = day === 0 ? 1 : (8 - day);
+  const next = new Date(now);
+  next.setDate(now.getDate() + diff);
+  return Utilities.formatDate(next, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+}
+
+// ─── TELEGRAM BÁO CA LÀM — 7h, 12h30, 19h mỗi ngày ────
+function notifyBossShiftSummary() {
+  const tz = Session.getScriptTimeZone();
+  const now = new Date();
+  const date = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+  const hour = now.getHours();
+  const schedules = sheetData(SHEETS.SCHEDULE).filter(r => r.date === date && r.shift !== 'off');
+  const employees = sheetData(SHEETS.EMPLOYEES).filter(e => e.role !== 'boss');
+
+  let shiftFilter, label;
+  if (hour < 10) {
+    shiftFilter = r => r.shift === 'morning' || r.shift === 'fullday' || r.shift === 'full';
+    label = '☀️ Ca Sáng hôm nay';
+  } else if (hour < 15) {
+    shiftFilter = r => r.shift === 'afternoon' || r.shift === 'fullday' || r.shift === 'full';
+    label = '🌆 Ca Chiều hôm nay';
+  } else {
+    shiftFilter = r => String(r.hasOT) === 'true' || r.shift === 'evening';
+    label = '🌙 Tăng Ca Tối hôm nay';
+  }
+
+  const working = schedules.filter(shiftFilter).map(r => {
+    const emp = employees.find(e => String(e.id) === String(r.empId));
+    const name = emp ? emp.name : r.empId;
+    const ot = (String(r.hasOT) === 'true' && r.eveningStart)
+      ? ` + 🌙 ${r.eveningStart}–${r.eveningEnd}` : '';
+    return `👤 ${name}${ot}`;
+  });
+
+  if (working.length === 0) {
+    sendTelegram(`📋 <b>${label}</b> — ${date}\n\nKhông có nhân viên nào làm ca này.`);
+  } else {
+    sendTelegram(`📋 <b>${label}</b> — ${date}\n\n${working.join('\n')}\n\nTổng: <b>${working.length} người</b>`);
+  }
+}
+
 function checkDailyAttendance() {
   const tz = Session.getScriptTimeZone();
   const date = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
@@ -866,6 +932,18 @@ function registerSchedule(data) {
       plannedHours: s.plannedHours || 0, actualHours: '', status: 'pending'
     });
   });
+  // Thông báo Boss trong app
+  const emps = sheetData(SHEETS.EMPLOYEES);
+  const emp = emps.find(e => String(e.id) === String(empId));
+  const empName = emp ? emp.name : empId;
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let nSheet = ss.getSheetByName('BossNotifications');
+  if (!nSheet) {
+    nSheet = ss.insertSheet('BossNotifications');
+    nSheet.appendRow(['date','type','message','read']);
+  }
+  nSheet.appendRow([today, 'schedule', `📅 ${empName} vừa hoàn thành đăng ký lịch làm tuần ${weekStart}`, 'false']);
   log('SCHEDULE', `${empId} đăng ký lịch tuần ${weekStart}`);
   return { ok: true };
 }

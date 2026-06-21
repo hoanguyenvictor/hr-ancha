@@ -1146,9 +1146,10 @@ async function renderScheduleTab() {
       const shift = s.shift || 'off';
       const hasOT = s.hasOT;
       const color = { fullday:'#7c3aed', morning:'#2563eb', afternoon:'#0891b2', off:'#9ca3af' }[shift] || '#9ca3af';
-      const otDot = hasOT ? `<span style="display:inline-block;width:6px;height:6px;background:#f59e0b;border-radius:50%;margin-left:2px;vertical-align:middle"></span>` : '';
+      const otTag = (String(hasOT) === 'true' || String(hasOT) === 'TRUE') && s.eveningStart
+        ? `<div style="font-size:0.62rem;color:#d97706;font-weight:700;margin-top:1px">🌙 ${s.eveningStart}–${s.eveningEnd}</div>` : '';
       return `<td style="padding:4px;text-align:center">
-        <span style="font-size:0.72rem;font-weight:600;color:${color}">${SHIFT_LABEL[shift]}${otDot}</span>
+        <span style="font-size:0.72rem;font-weight:600;color:${color}">${SHIFT_LABEL[shift]}</span>${otTag}
       </td>`;
     }).join('');
     return `<tr style="border-top:1px solid var(--border)">
