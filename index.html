@@ -811,10 +811,14 @@ function showEmpDetail(empId) {
   document.getElementById('empDetailContent').innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <div class="avatar" style="background:${emp.color||'#667eea'};width:52px;height:52px;font-size:1.2rem">${initials}</div>
-      <div>
+      <div style="flex:1">
         <div style="font-weight:800;font-size:1rem">${emp.name}</div>
         <div style="font-size:0.78rem;color:var(--muted)">${emp.phone || ''}</div>
       </div>
+      <button onclick="confirmDeleteEmployee('${empId}','${emp.name}')"
+        style="background:none;border:1px solid #fca5a5;border-radius:8px;color:#ef4444;font-size:0.7rem;padding:4px 8px;cursor:pointer;white-space:nowrap;line-height:1.4">
+        🗑️ Xoá
+      </button>
     </div>
 
     <div class="stat-grid" style="margin-bottom:14px">
@@ -843,9 +847,6 @@ function showEmpDetail(empId) {
     <div style="display:flex;gap:8px;margin-top:16px">
       <button class="btn btn-warning btn-sm" onclick="addDeduction('${empId}')">⚠️ Thêm Trừ Thưởng</button>
       <button class="btn btn-success btn-sm" onclick="approveAllTasks('${empId}')">✅ Xác Nhận OK</button>
-    </div>
-    <div style="margin-top:10px">
-      <button class="btn btn-danger btn-sm" style="width:100%" onclick="confirmDeleteEmployee('${empId}','${emp.name}')">🗑️ Xoá Nhân Viên</button>
     </div>
   `;
   document.getElementById('empDetailModal').classList.remove('hidden');
