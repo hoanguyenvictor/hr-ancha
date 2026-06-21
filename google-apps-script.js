@@ -485,16 +485,16 @@ function updateChecklist(data) {
 // ─── TODAY DATA ───────────────────────────────────────────────────
 function getTodayData(data) {
   const { empId, date } = data;
-  const checkins = sheetData(SHEETS.CHECKIN).filter(r => r.empId===empId && r.date===date);
-  const checklists = sheetData(SHEETS.CHECKLIST).filter(r => r.empId===empId && r.date===date);
-  const supplies = sheetData(SHEETS.SUPPLY).filter(r => r.empId===empId && r.date===date);
+  const checkins = sheetData(SHEETS.CHECKIN).filter(r => String(r.empId)===String(empId) && String(r.date)===String(date));
+  const checklists = sheetData(SHEETS.CHECKLIST).filter(r => String(r.empId)===String(empId) && String(r.date)===String(date));
+  const supplies = sheetData(SHEETS.SUPPLY).filter(r => String(r.empId)===String(empId) && String(r.date)===String(date));
 
   // Lịch đã đăng ký hôm nay
-  const todaySchedule = sheetData(SHEETS.SCHEDULE).find(r => r.empId === empId && r.date === date);
-  const scheduledShift = todaySchedule ? (todaySchedule.shift || 'full') : 'full';
-  const hasOT        = todaySchedule && String(todaySchedule.hasOT) === 'true';
-  const eveningStart = todaySchedule ? (todaySchedule.eveningStart || '') : '';
-  const eveningEnd   = todaySchedule ? (todaySchedule.eveningEnd   || '') : '';
+  const todaySchedule = sheetData(SHEETS.SCHEDULE).find(r => String(r.empId)===String(empId) && String(r.date)===String(date));
+  const scheduledShift = todaySchedule ? (todaySchedule.shift || 'fullday') : 'fullday';
+  const eveningStart = todaySchedule ? fmtTime(todaySchedule.eveningStart) : '';
+  const eveningEnd   = todaySchedule ? fmtTime(todaySchedule.eveningEnd)   : '';
+  const hasOT        = !!(eveningStart && eveningStart !== '');
 
   const checklist = {};
   checklists.forEach(r => { checklist[r.taskId] = r.done === 'TRUE'; });
@@ -544,12 +544,12 @@ function getTodayReports(data) {
 
   const reports = {};
   employees.forEach(emp => {
-    const ci = checkins.find(r => r.empId === emp.id) || {};
+    const ci = checkins.find(r => String(r.empId) === String(emp.id)) || {};
     const cl = {};
-    checklists.filter(r => r.empId === emp.id).forEach(r => { cl[r.taskId] = r.done === 'TRUE'; });
-    const sup = supplies.find(r => r.empId === emp.id);
-    const missedPing = pings.some(r => r.empId === emp.id);
-    const activeShift = overtime.some(r => r.empId === emp.id);
+    checklists.filter(r => String(r.empId) === String(emp.id)).forEach(r => { cl[r.taskId] = r.done === 'TRUE'; });
+    const sup = supplies.find(r => String(r.empId) === String(emp.id));
+    const missedPing = pings.some(r => String(r.empId) === String(emp.id));
+    const activeShift = overtime.some(r => String(r.empId) === String(emp.id));
 
     reports[emp.id] = {
       checkin: ci.checkinTime || null,
@@ -977,9 +977,18 @@ function registerSchedule(data) {
 
 function getSchedule(data) {
   const { empId, weekStart } = data;
-  const rows = sheetData(SHEETS.SCHEDULE).filter(r => r.empId === empId && r.weekStart === weekStart);
+  const rows = sheetData(SHEETS.SCHEDULE).filter(r =>
+    String(r.empId) === String(empId) && String(r.weekStart) === String(weekStart)
+  );
   const result = {};
-  rows.forEach(r => { result[r.day] = r; });
+  rows.forEach(r => {
+    result[r.day] = {
+      ...r,
+      eveningStart: fmtTime(r.eveningStart),
+      eveningEnd:   fmtTime(r.eveningEnd),
+      hasOT: !!(r.eveningStart && String(r.eveningStart) !== ''),
+    };
+  });
   return { ok: true, data: result };
 }
 
@@ -993,7 +1002,7 @@ function fmtTime(val) {
 
 function getWeeklySchedule(data) {
   const { weekStart } = data;
-  const rows = sheetData(SHEETS.SCHEDULE).filter(r => r.weekStart === weekStart);
+  const rows = sheetData(SHEETS.SCHEDULE).filter(r => String(r.weekStart) === String(weekStart));
   const result = {};
   rows.forEach(r => {
     if (!result[r.empId]) result[r.empId] = {};

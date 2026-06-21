@@ -128,7 +128,7 @@ function logout() {
 }
 
 // ── DATE HELPERS ───────────────────────────────────────
-function today() { return new Date().toISOString().slice(0, 10); }
+function today() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function nowTime() { return new Date().toTimeString().slice(0, 5); }
 function monthKey() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
 function formatVND(n) { return Number(n).toLocaleString('vi-VN') + 'đ'; }
