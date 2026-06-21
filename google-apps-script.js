@@ -318,7 +318,12 @@ function sheetData(name) {
     const obj = {};
     headers.forEach((h, i) => {
       let v = row[i];
-      if (v instanceof Date) v = Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+      if (v instanceof Date) {
+        const timeFields = ['eveningStart','eveningEnd','checkinTime','checkoutTime'];
+        v = timeFields.includes(h)
+          ? Utilities.formatDate(v, tz, 'HH:mm')
+          : Utilities.formatDate(v, tz, 'yyyy-MM-dd');
+      }
       obj[h] = v;
     });
     return obj;
