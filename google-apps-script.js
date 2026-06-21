@@ -226,6 +226,7 @@ function doGet(e) {
       case 'pingMiss':            result = handlePing(data, false); break;
       case 'addDeduction':        result = addDeduction(data); break;
       case 'getSalaryData':       result = getSalaryData(data); break;
+      case 'getEmpSalaryDetail':  result = getEmpSalaryDetail(data); break;
       case 'saveSalesBonus':      result = saveSalesBonus(data); break;
       case 'confirmSalary':       result = confirmSalary(data); break;
       case 'getOTSummary':        result = getOTSummary(data); break;
@@ -786,9 +787,9 @@ function getSalaryData(data) {
 
   const result = {};
   employees.forEach(emp => {
-    const empDeductions = deductions.filter(d => d.empId === emp.id);
-    const empSalary = salaries.find(s => s.empId === emp.id);
-    const empOT = overtime.filter(o => o.empId === emp.id);
+    const empDeductions = deductions.filter(d => String(d.empId) === String(emp.id));
+    const empSalary = salaries.find(s => String(s.empId) === String(emp.id));
+    const empOT = overtime.filter(o => String(o.empId) === String(emp.id));
     const otHoursOld = empOT.reduce((s, o) => s + (Number(o.hours)||0), 0);
     // Giờ ngoài giờ từ Schedule: ưu tiên actualHours, fallback plannedHours
     const empSchedOT = scheduleOT.filter(r => String(r.empId) === String(emp.id));
@@ -832,6 +833,27 @@ function getSalaryData(data) {
     };
   });
   return { ok: true, data: result };
+}
+
+// Trả về chi tiết lương + deductions của 1 nhân viên cụ thể (dùng cho employee app)
+function getEmpSalaryDetail(data) {
+  const { empId, month } = data;
+  const deductions = sheetData(SHEETS.DEDUCTIONS).filter(r =>
+    r.month === month && String(r.empId) === String(empId)
+  );
+  const attendanceDeductions = deductions.filter(d =>
+    d.reason && (
+      d.reason.includes('late') || d.reason.includes('early') ||
+      d.reason.includes('absent') || d.reason.includes('Đi muộn') ||
+      d.reason.includes('Về sớm') || d.reason.includes('Không check')
+    )
+  );
+  const taskDeductions = deductions.filter(d =>
+    d.reason && (d.reason.includes('Checklist') || d.reason.includes('checklist') || d.reason.includes('nhiệm vụ'))
+  );
+  const attendanceBonus = Math.max(0, 300000 - attendanceDeductions.reduce((s,d)=>s+Number(d.amount||50000),0));
+  const tasksBonus = Math.max(0, 500000 - taskDeductions.reduce((s,d)=>s+Number(d.amount||50000),0));
+  return { ok: true, data: { attendanceBonus, tasksBonus, deductions } };
 }
 
 function saveSalesBonus(data) {

@@ -1556,17 +1556,28 @@ async function confirmPing() {
 
 // ─── SALARY PAGE ───────────────────────────────────────
 async function renderSalary() {
-  const bonus = calcBonus();
-  document.getElementById('totalBonusDisplay').textContent = formatVND(bonus.total);
-  document.getElementById('bonusAttendance').textContent = formatVND(bonus.attendance);
-  document.getElementById('bonusTasks').textContent = formatVND(bonus.tasks);
+  // Lấy deductions thực từ backend (bao gồm auto-penalty từ hệ thống)
+  let attendanceBonus = DB_CONFIG.BONUS_ATTENDANCE;
+  let tasksBonus = DB_CONFIG.BONUS_TASKS;
+  let deductions = [];
+  try {
+    const res = await apiCall('getEmpSalaryDetail', { empId: state.user.id, month: monthKey() });
+    if (res.ok && res.data) {
+      attendanceBonus = res.data.attendanceBonus;
+      tasksBonus = res.data.tasksBonus;
+      deductions = res.data.deductions || [];
+    }
+  } catch(e) {}
+  const totalBonus = attendanceBonus + tasksBonus;
+  document.getElementById('totalBonusDisplay').textContent = formatVND(totalBonus);
+  document.getElementById('bonusAttendance').textContent = formatVND(attendanceBonus);
+  document.getElementById('bonusTasks').textContent = formatVND(tasksBonus);
 
-  const deductions = JSON.parse(localStorage.getItem(`deductions_${monthKey()}`) || '[]');
   const deductEl = document.getElementById('deductionList');
   deductEl.innerHTML = deductions.length ? deductions.map(d =>
     `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:0.85rem">
       <span>${d.reason}</span>
-      <span style="color:var(--danger);font-weight:700">-${formatVND(d.amount)}</span>
+      <span style="color:var(--danger);font-weight:700">-${formatVND(Number(d.amount)||50000)}</span>
     </div>`).join('') : `<p style="font-size:0.85rem;color:var(--muted)">Chưa có khoản trừ nào 🎉</p>`;
 
   // OT summary
