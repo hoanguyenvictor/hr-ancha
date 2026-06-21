@@ -167,12 +167,11 @@
 </div>
 
 <!-- ── NHÂN VIÊN CHI TIẾT ─────────────────────────── -->
-<!-- ── NHÂN SỰ (gộp Nhân Viên + Tăng Ca + Lương) ─────── -->
+<!-- ── NHÂN SỰ (Nhân Viên + Lương) ─────── -->
 <div class="page" id="page-staff">
   <!-- Sub-tabs -->
   <div style="display:flex;gap:6px;margin-bottom:14px;background:var(--card);border-radius:12px;padding:4px">
     <button id="stab-employees" onclick="switchStaffTab('employees')" style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.78rem;font-weight:700;cursor:pointer;background:var(--primary);color:white">👥 Nhân Viên</button>
-    <button id="stab-overtime"  onclick="switchStaffTab('overtime')"  style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.78rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">🌙 Tăng Ca</button>
     <button id="stab-salary"    onclick="switchStaffTab('salary')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.78rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">💰 Lương</button>
   </div>
 
@@ -185,17 +184,7 @@
     </div>
   </div>
 
-  <!-- Tăng Ca -->
-  <div id="staffTab-overtime" style="display:none">
-    <div class="card">
-      <div class="card-title"><span class="icon">⏳</span>Chờ Duyệt</div>
-      <div id="otPendingList"><p style="font-size:0.85rem;color:var(--muted)">Không có đăng ký nào chờ duyệt</p></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">✅</span>Đã Duyệt Tháng Này</div>
-      <div id="otApprovedList"><p style="font-size:0.85rem;color:var(--muted)">Chưa có</p></div>
-    </div>
-  </div>
+  <div id="staffTab-overtime" style="display:none"></div>
 
   <!-- Lương -->
   <div id="staffTab-salary" style="display:none">
@@ -1146,8 +1135,16 @@ async function renderScheduleTab() {
       const shift = s.shift || 'off';
       const hasOT = s.hasOT;
       const color = { fullday:'#7c3aed', morning:'#2563eb', afternoon:'#0891b2', off:'#9ca3af' }[shift] || '#9ca3af';
+      const fmtTime = v => {
+        if (!v) return '';
+        const s = String(v);
+        // Sheets Date object serialized as "1899-12-30T19:30:00.000Z" → lấy HH:MM
+        if (s.includes('T')) return s.slice(11, 16);
+        // Đã là HH:MM string
+        return s.slice(0, 5);
+      };
       const otTag = s.eveningStart
-        ? `<div style="font-size:0.62rem;color:#d97706;font-weight:700;margin-top:2px">🌙 ${s.eveningStart}–${s.eveningEnd}</div>` : '';
+        ? `<div style="font-size:0.62rem;color:#d97706;font-weight:700;margin-top:2px">🌙 ${fmtTime(s.eveningStart)}–${fmtTime(s.eveningEnd)}</div>` : '';
       return `<td style="padding:4px;text-align:center">
         <span style="font-size:0.72rem;font-weight:600;color:${color}">${SHIFT_LABEL[shift]}</span>${otTag}
       </td>`;
