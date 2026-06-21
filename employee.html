@@ -1219,7 +1219,7 @@ function getWeekDates(offset = 0) {
   return DAY_KEYS.map((_, i) => {
     const d = new Date(monday);
     d.setDate(monday.getDate() + i);
-    return d.toISOString().slice(0,10);
+    return fmtDate(d);
   });
 }
 
@@ -1639,7 +1639,7 @@ async function loadEmpDiary() {
     const dow = now.getDay() === 0 ? 6 : now.getDay() - 1;
     for (let i = dow; i >= 0; i--) {
       const d = new Date(now); d.setDate(now.getDate() - i);
-      dates.push(d.toISOString().slice(0,10));
+      dates.push(fmtDate(d));
     }
   } else {
     const y = now.getFullYear(), m = now.getMonth();

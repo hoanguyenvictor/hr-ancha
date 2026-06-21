@@ -1026,7 +1026,7 @@ function startOTShift(data) {
   // Tính weekStart (thứ 2 của tuần đó)
   const mon = new Date(d);
   mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-  const weekStart = mon.toISOString().slice(0,10);
+  const weekStart = Utilities.formatDate(mon, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
   for (let i = 1; i < vals.length; i++) {
     if (String(vals[i][0]) === String(empId) &&
@@ -1053,7 +1053,7 @@ function endOTShift(data) {
   const dayKey = ['sun','mon','tue','wed','thu','fri','sat'][day];
   const mon = new Date(d);
   mon.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
-  const weekStart = mon.toISOString().slice(0,10);
+  const weekStart = Utilities.formatDate(mon, Session.getScriptTimeZone(), 'yyyy-MM-dd');
 
   for (let i = 1; i < vals.length; i++) {
     if (String(vals[i][0]) === String(empId) &&
@@ -1199,7 +1199,7 @@ function uploadPhoto(data) {
       empId, date, time: new Date().toTimeString().slice(0,5),
       type, label: label || type,
       url, driveId: file.getId(),
-      expires: new Date(Date.now() + 7*86400000).toISOString().slice(0,10)
+      expires: Utilities.formatDate(new Date(Date.now() + 7*86400000), Session.getScriptTimeZone(), 'yyyy-MM-dd')
     });
     return { ok: true, url };
   } catch(e) {
@@ -1238,7 +1238,7 @@ function finalizeUpload(data) {
       empId, date, time: new Date().toTimeString().slice(0,5),
       type, label: label || type,
       url, driveId: file.getId(),
-      expires: new Date(Date.now() + 7*86400000).toISOString().slice(0,10)
+      expires: Utilities.formatDate(new Date(Date.now() + 7*86400000), Session.getScriptTimeZone(), 'yyyy-MM-dd')
     });
     return { ok: true, url };
   } catch(e) {
@@ -1253,12 +1253,12 @@ function getPhotos(data) {
   // Lấy ảnh trong khoảng `days` ngày gần nhất
   const from = new Date(date);
   from.setDate(from.getDate() - (days || 6));
-  const fromStr = from.toISOString().slice(0,10);
+  const fromStr = Utilities.formatDate(from, Session.getScriptTimeZone(), 'yyyy-MM-dd');
   return { ok: true, data: rows.filter(r => r.date >= fromStr && r.date <= date) };
 }
 
 function cleanOldPhotos() {
-  const today = new Date().toISOString().slice(0,10);
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   const sheet = getSheet(SHEETS.PHOTOS);
   const vals = sheet.getDataRange().getValues();
   const headers = vals[0];
