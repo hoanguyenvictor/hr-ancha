@@ -418,18 +418,25 @@ function getTodayData(data) {
   // Lịch đã đăng ký hôm nay
   const todaySchedule = sheetData(SHEETS.SCHEDULE).find(r => r.empId === empId && r.date === date);
   const scheduledShift = todaySchedule ? (todaySchedule.shift || 'full') : 'full';
+  const hasOT        = todaySchedule && String(todaySchedule.hasOT) === 'true';
+  const eveningStart = todaySchedule ? (todaySchedule.eveningStart || '') : '';
+  const eveningEnd   = todaySchedule ? (todaySchedule.eveningEnd   || '') : '';
 
   const checklist = {};
   checklists.forEach(r => { checklist[r.taskId] = r.done === 'TRUE'; });
 
   const morning   = checkins.find(r => (r.shift||'morning') === 'morning') || {};
   const afternoon = checkins.find(r => r.shift === 'afternoon') || {};
+  const evening   = checkins.find(r => r.shift === 'evening') || {};
   const sup = supplies[0] || null;
 
   return {
     ok: true,
     data: {
       scheduledShift,
+      hasOT, eveningStart, eveningEnd,
+      eveningCheckin:  evening.checkinTime  || null,
+      eveningCheckout: evening.checkoutTime || null,
       morningCheckin:    morning.checkinTime   || null,
       morningCheckout:   morning.checkoutTime  || null,
       morningLate:       morning.late === 'TRUE',
