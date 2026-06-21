@@ -1649,16 +1649,29 @@ async function loadEmpDiary() {
   el.innerHTML = html || '<p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px">Không có dữ liệu</p>';
 }
 
+async function markMyNotifRead(row, btn) {
+  await apiCall('markEmpNotifRead', { row });
+  btn.closest('div').querySelector('button')?.remove();
+  const done = document.createElement('div');
+  done.style.cssText = 'font-size:0.72rem;color:var(--muted);margin-top:4px';
+  done.textContent = '✓ Đã đọc';
+  btn.parentElement.appendChild(done);
+  btn.remove();
+  loadEmpNotifications();
+}
+
 async function loadEmpNotifications() {
   const el = document.getElementById('empNotifList');
   el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p>';
-  const [resCheck, resReturn] = await Promise.all([
+  const [resCheck, resReturn, resNotif] = await Promise.all([
     apiCall('getMySubmissions', { empId: state.user.id }),
     apiCall('getMyReturns', { empId: state.user.id }),
+    apiCall('getEmpNotifications', { empId: state.user.id }),
   ]);
   const checklists = resCheck.ok && resCheck.data ? resCheck.data : [];
   const returns = resReturn.ok && resReturn.data ? resReturn.data : [];
-  if (checklists.length === 0 && returns.length === 0) {
+  const sysNotifs = resNotif.ok && resNotif.data ? resNotif.data : [];
+  if (checklists.length === 0 && returns.length === 0 && sysNotifs.length === 0) {
     el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px">Chưa có thông báo nào</p>';
     return;
   }
@@ -1687,8 +1700,20 @@ async function loadEmpNotifications() {
     </div>`;
   }).join('');
 
-  el.innerHTML = checkHTML + returnHTML;
-  document.getElementById('empNotifBadge').classList.add('hidden');
+  const sysHTML = sysNotifs.map(n => {
+    const isUnread = n.read === 'false' || n.read === false;
+    return `<div style="border-left:4px solid var(--primary);padding:12px 14px;border-radius:0 10px 10px 0;background:${isUnread?'rgba(99,102,241,0.08)':'rgba(0,0,0,0.03)'};margin-bottom:10px">
+      <div style="font-size:0.7rem;color:var(--muted);font-weight:700">🔔 THÔNG BÁO HỆ THỐNG · ${n.date}</div>
+      <div style="font-size:0.88rem;margin-top:6px;line-height:1.5">${n.message}</div>
+      ${isUnread ? `<button onclick="markMyNotifRead(${n._row},this)" style="margin-top:8px;padding:4px 12px;font-size:0.75rem;border:none;border-radius:6px;background:var(--primary);color:#fff;cursor:pointer">Đã đọc</button>` : '<div style="font-size:0.72rem;color:var(--muted);margin-top:4px">✓ Đã đọc</div>'}
+    </div>`;
+  }).join('');
+
+  el.innerHTML = sysHTML + checkHTML + returnHTML;
+  const unreadCount = sysNotifs.filter(n => n.read === 'false' || n.read === false).length;
+  const badge = document.getElementById('empNotifBadge');
+  if (unreadCount > 0) { badge.textContent = unreadCount; badge.classList.remove('hidden'); }
+  else badge.classList.add('hidden');
   localStorage.setItem('empNotifSeen', String(checklists.length + returns.length));
 }
 

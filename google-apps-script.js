@@ -187,6 +187,8 @@ function doGet(e) {
       case 'getAllReturns':          result = { ok: true, data: sheetData(SHEETS.RETURN_SUBS) }; break;
       case 'getBossNotifications':  result = getBossNotifications(); break;
       case 'markBossNotifRead':     result = markBossNotifRead(data); break;
+      case 'getEmpNotifications':   result = getEmpNotifications(data); break;
+      case 'markEmpNotifRead':      result = markEmpNotifRead(data); break;
       case 'getPendingReturns':     result = getPendingReturns(data); break;
       case 'confirmReturn':         result = confirmReturn(data); break;
       case 'getMyReturns':          result = getMyReturns(data); break;
@@ -763,10 +765,54 @@ function getSalaryData(data) {
 
 function saveSalesBonus(data) {
   const { month, bonuses } = data;
+  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
   Object.entries(bonuses).forEach(([empId, amount]) => {
     const found = updateRow(SHEETS.SALARY, 'empId', empId, { salesBonus: amount });
     if (!found) appendRow(SHEETS.SALARY, { empId, month, salesBonus: amount, confirmed: 'FALSE' });
+    // Gửi thông báo cho nhân viên
+    if (Number(amount) > 0) {
+      pushEmpNotification(empId, today, 'sales_bonus',
+        `🏆 Boss đã ghi nhận thưởng doanh số tháng ${month} cho bạn: ${Number(amount).toLocaleString('vi-VN')}đ`);
+    }
   });
+  return { ok: true };
+}
+
+function pushEmpNotification(empId, date, type, message) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('EmpNotifications');
+  if (!sheet) {
+    sheet = ss.insertSheet('EmpNotifications');
+    sheet.appendRow(['empId','date','type','message','read']);
+  }
+  sheet.appendRow([empId, date, type, message, 'false']);
+}
+
+function getEmpNotifications(data) {
+  const { empId } = data;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('EmpNotifications');
+  if (!sheet) return { ok: true, data: [] };
+  const vals = sheet.getDataRange().getValues();
+  if (vals.length <= 1) return { ok: true, data: [] };
+  const headers = vals[0];
+  const rows = vals.slice(1).map((r, i) => {
+    const obj = {};
+    headers.forEach((h, j) => obj[h] = r[j]);
+    obj._row = i + 2;
+    return obj;
+  }).filter(r => String(r.empId) === String(empId));
+  return { ok: true, data: rows.reverse().slice(0, 50) };
+}
+
+function markEmpNotifRead(data) {
+  const { row } = data;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('EmpNotifications');
+  if (!sheet || !row) return { ok: true };
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const readCol = headers.indexOf('read') + 1;
+  if (readCol > 0) sheet.getRange(row, readCol).setValue('true');
   return { ok: true };
 }
 
