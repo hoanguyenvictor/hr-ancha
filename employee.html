@@ -21,7 +21,10 @@
       <h1 id="headerName">Xin chào! 👋</h1>
       <div class="sub" id="headerDate"></div>
     </div>
-    <div style="display:flex;align-items:center;gap:10px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <button onclick="switchPage('emp-notifications',null)" style="position:relative;background:rgba(255,255,255,0.2);border:none;color:white;border-radius:8px;padding:6px 10px;font-size:0.75rem;cursor:pointer">
+        🔔<span id="empNotifBadge" class="hidden" style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:white;border-radius:10px;padding:1px 5px;font-size:0.65rem;font-weight:700"></span>
+      </button>
       <div id="headerAvatar" class="avatar" style="background:rgba(255,255,255,0.3)"></div>
       <button onclick="logoutEmployee()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:8px;padding:6px 10px;font-size:0.75rem;cursor:pointer">Thoát</button>
     </div>
@@ -458,13 +461,6 @@
   </button>
   <button class="nav-item" onclick="switchPage('salary',this)">
     <span class="icon">💰</span><span>Lương</span>
-  </button>
-  <button class="nav-item" onclick="switchPage('emp-notifications',this)" id="empNotifNav">
-    <span style="position:relative;display:inline-block">
-      <span class="icon">🔔</span>
-      <span id="empNotifBadge" class="hidden" style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:white;border-radius:10px;padding:1px 5px;font-size:0.6rem;font-weight:700"></span>
-    </span>
-    <span>Thông Báo</span>
   </button>
   <button class="nav-item" onclick="switchPage('settings',this)">
     <span class="icon">⚙️</span><span>Cài Đặt</span>
