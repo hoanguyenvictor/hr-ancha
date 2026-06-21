@@ -167,16 +167,62 @@
 </div>
 
 <!-- ── NHÂN VIÊN CHI TIẾT ─────────────────────────── -->
-<div class="page" id="page-employees">
-  <div class="card">
-    <div class="card-title"><span class="icon">👥</span>Quản Lý Nhân Viên</div>
-    <button class="btn btn-primary btn-sm" onclick="openAddEmpModal()" style="margin-bottom:12px">+ Thêm Nhân Viên</button>
-    <div id="empDetailList"></div>
+<!-- ── NHÂN SỰ (gộp Nhân Viên + Tăng Ca + Lương) ─────── -->
+<div class="page" id="page-staff">
+  <!-- Sub-tabs -->
+  <div style="display:flex;gap:6px;margin-bottom:14px;background:var(--card);border-radius:12px;padding:4px">
+    <button id="stab-employees" onclick="switchStaffTab('employees')" style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.78rem;font-weight:700;cursor:pointer;background:var(--primary);color:white">👥 Nhân Viên</button>
+    <button id="stab-overtime"  onclick="switchStaffTab('overtime')"  style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.78rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">🌙 Tăng Ca</button>
+    <button id="stab-salary"    onclick="switchStaffTab('salary')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.78rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">💰 Lương</button>
+  </div>
+
+  <!-- Nhân Viên -->
+  <div id="staffTab-employees">
+    <div class="card">
+      <div class="card-title"><span class="icon">👥</span>Quản Lý Nhân Viên</div>
+      <button class="btn btn-primary btn-sm" onclick="openAddEmpModal()" style="margin-bottom:12px">+ Thêm Nhân Viên</button>
+      <div id="empDetailList"></div>
+    </div>
+  </div>
+
+  <!-- Tăng Ca -->
+  <div id="staffTab-overtime" style="display:none">
+    <div class="card">
+      <div class="card-title"><span class="icon">⏳</span>Chờ Duyệt</div>
+      <div id="otPendingList"><p style="font-size:0.85rem;color:var(--muted)">Không có đăng ký nào chờ duyệt</p></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">✅</span>Đã Duyệt Tháng Này</div>
+      <div id="otApprovedList"><p style="font-size:0.85rem;color:var(--muted)">Chưa có</p></div>
+    </div>
+  </div>
+
+  <!-- Lương -->
+  <div id="staffTab-salary" style="display:none">
+    <div style="background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;border-radius:16px;padding:20px;margin-bottom:12px">
+      <div style="font-size:0.85rem;opacity:0.85;margin-bottom:4px">Tháng <span id="salaryMonth"></span></div>
+      <div style="font-size:1.8rem;font-weight:800" id="totalPayrollDisplay">—</div>
+      <div style="font-size:0.78rem;opacity:0.75;margin-top:4px">Tổng chi lương + thưởng</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">🏆</span>Nhập Thưởng Doanh Số Tháng Này</div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Điền thưởng doanh số cho từng nhân viên trước ngày 30/31.</p>
+      <div id="salesBonusInputs"></div>
+      <button class="btn btn-primary" onclick="saveSalesBonus()" style="margin-top:8px">💾 Lưu Thưởng Doanh Số</button>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">💰</span>Bảng Lương Chi Tiết</div>
+      <div id="salaryTable"></div>
+      <button class="btn btn-success" id="confirmSalaryBtn" onclick="confirmSalary()" style="margin-top:12px">
+        ✅ Xác Nhận & Chốt Lương Tháng
+      </button>
+    </div>
   </div>
 </div>
 
-<!-- ── DUYỆT TĂNG CA ──────────────────────────────── -->
-<div class="page" id="page-overtime">
+<!-- hidden stubs giữ tương thích switchPage cũ -->
+<div id="page-employees" style="display:none"></div>
+<div id="page-overtime" style="display:none">
   <div class="card">
     <div class="card-title"><span class="icon">⏳</span>Chờ Duyệt</div>
     <div id="otPendingList"><p style="font-size:0.85rem;color:var(--muted)">Không có đăng ký nào chờ duyệt</p></div>
@@ -187,29 +233,7 @@
   </div>
 </div>
 
-<!-- ── LƯƠNG THÁNG ─────────────────────────────────── -->
-<div class="page" id="page-salary">
-  <div style="background:linear-gradient(135deg,var(--primary),var(--secondary));color:white;border-radius:16px;padding:20px;margin-bottom:12px">
-    <div style="font-size:0.85rem;opacity:0.85;margin-bottom:4px">Tháng <span id="salaryMonth"></span></div>
-    <div style="font-size:1.8rem;font-weight:800" id="totalPayrollDisplay">—</div>
-    <div style="font-size:0.78rem;opacity:0.75;margin-top:4px">Tổng chi lương + thưởng</div>
-  </div>
-
-  <div class="card">
-    <div class="card-title"><span class="icon">🏆</span>Nhập Thưởng Doanh Số Tháng Này</div>
-    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Điền thưởng doanh số cho từng nhân viên trước ngày 30/31.</p>
-    <div id="salesBonusInputs"></div>
-    <button class="btn btn-primary" onclick="saveSalesBonus()" style="margin-top:8px">💾 Lưu Thưởng Doanh Số</button>
-  </div>
-
-  <div class="card">
-    <div class="card-title"><span class="icon">💰</span>Bảng Lương Chi Tiết</div>
-    <div id="salaryTable"></div>
-    <button class="btn btn-success" id="confirmSalaryBtn" onclick="confirmSalary()" style="margin-top:12px">
-      ✅ Xác Nhận & Chốt Lương Tháng
-    </button>
-  </div>
-</div>
+<div id="page-salary" style="display:none"></div>
 
 <!-- ── LỊCH & PHẠT ─────────────────────────────────── -->
 <div class="page" id="page-schedule">
@@ -286,7 +310,7 @@
 <!-- ── NHẬT KÝ ─────────────────────────────────────── -->
 <div class="page" id="page-diary">
   <div class="card">
-    <div class="card-title"><span class="icon">📅</span>Nhật Ký Toàn Đội</div>
+    <div class="card-title"><span class="icon">📒</span>Nhật Ký Toàn Đội</div>
     <div style="display:flex;gap:6px;margin-bottom:10px">
       <button onclick="setBossDiaryFilter('day')" id="bdfilter-day" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--primary);background:var(--primary);color:white;font-weight:700;cursor:pointer;font-size:0.82rem">Hôm nay</button>
       <button onclick="setBossDiaryFilter('week')" id="bdfilter-week" style="flex:1;padding:7px;border-radius:8px;border:1.5px solid var(--border);background:var(--card);color:var(--text);font-weight:600;cursor:pointer;font-size:0.82rem">Tuần này</button>
@@ -371,21 +395,15 @@
   <button class="nav-item active" onclick="switchPage('overview',this)">
     <span class="icon">🏠</span><span>Tổng Quan</span>
   </button>
-  <button class="nav-item" onclick="switchPage('employees',this)">
-    <span class="icon">👥</span><span>Nhân Viên</span>
-  </button>
-  <button class="nav-item" onclick="switchPage('overtime',this)" style="position:relative">
-    <span class="icon">🌙</span><span>Tăng Ca</span>
+  <button class="nav-item" onclick="switchPage('staff',this)" style="position:relative">
+    <span class="icon">👤</span><span>Nhân Sự</span>
     <div class="notif-dot hidden" id="otDot"></div>
-  </button>
-  <button class="nav-item" onclick="switchPage('salary',this)">
-    <span class="icon">💰</span><span>Lương</span>
   </button>
   <button class="nav-item" onclick="switchPage('schedule',this)">
     <span class="icon">📅</span><span>Lịch</span>
   </button>
   <button class="nav-item" onclick="switchPage('diary',this)">
-    <span class="icon">📅</span><span>Nhật Ký</span>
+    <span class="icon">📒</span><span>Nhật Ký</span>
   </button>
   <button class="nav-item" onclick="switchPage('notifications',this)" id="navNotif">
     <span class="icon">🔔</span><span>Thông Báo</span>
@@ -1250,19 +1268,41 @@ function syncPenaltiesToSalary() {
 }
 
 function switchPage(name, btn) {
+  // Redirect cũ → staff
+  if (name === 'employees' || name === 'overtime' || name === 'salary') {
+    const tab = name;
+    switchPage('staff');
+    switchStaffTab(tab);
+    return;
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   document.getElementById(`page-${name}`).classList.add('active');
   if (btn) btn.classList.add('active');
   else {
-    const idx = { overview:0, employees:1, overtime:2, salary:3, schedule:4, diary:5, notifications:6, photos:7, settings:8 };
-    document.querySelectorAll('.nav-item')[idx[name]??0].classList.add('active');
+    const idx = { overview:0, staff:1, schedule:2, diary:3, notifications:4, settings:5 };
+    const navBtns = document.querySelectorAll('.nav-item');
+    if (navBtns[idx[name] ?? 0]) navBtns[idx[name] ?? 0].classList.add('active');
   }
-  if (name === 'salary') renderSalaryTab();
+  if (name === 'staff') { loadEmployees(); loadOvertimeList(); }
   if (name === 'schedule') renderScheduleTab();
-  if (name === 'photos') renderPhotosTab();
   if (name === 'notifications') { loadNotifications(); loadAttendanceReports(); }
   if (name === 'diary') { window._bossDiaryFilter = window._bossDiaryFilter || 'day'; loadBossDiary(); }
+}
+
+function switchStaffTab(tab) {
+  ['employees','overtime','salary'].forEach(t => {
+    const el = document.getElementById(`staffTab-${t}`);
+    const btn = document.getElementById(`stab-${t}`);
+    if (!el || !btn) return;
+    const active = t === tab;
+    el.style.display = active ? '' : 'none';
+    btn.style.background = active ? 'var(--primary)' : 'transparent';
+    btn.style.color = active ? 'white' : 'var(--muted)';
+  });
+  if (tab === 'salary') renderSalaryTab();
+  if (tab === 'overtime') loadOvertimeList();
+  if (tab === 'employees') loadEmployees();
 }
 
 // ─── NHẬT KÝ TOÀN ĐỘI ────────────────────────────────────

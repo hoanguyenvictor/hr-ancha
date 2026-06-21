@@ -745,15 +745,19 @@ async function doShiftAction(shift) {
   const isCheckin = shift === 'morning' ? !d.morningCheckin : !d.afternoonCheckin;
 
   btn.disabled = true;
-  btn.textContent = '📡 Đang xác định vị trí...';
+  const isSunday = new Date().getDay() === 0;
+  btn.textContent = isSunday ? '🏠 Đang check-in online...' : '📡 Đang xác định vị trí...';
 
   try {
-    const gps = await checkInOffice();
-    if (!gps.ok) {
-      showToast(gps.error || `❌ Bạn cách văn phòng ${gps.distance}m (cần trong ${DB_CONFIG.OFFICE_RADIUS_M}m)`, 'danger');
-      btn.disabled = false;
-      btn.textContent = isCheckin ? '📍 Check-in' : '🏁 Check-out';
-      return;
+    let gps = { ok: true, lat: null, lng: null };
+    if (!isSunday) {
+      gps = await checkInOffice();
+      if (!gps.ok) {
+        showToast(gps.error || `❌ Bạn cách văn phòng ${gps.distance}m (cần trong ${DB_CONFIG.OFFICE_RADIUS_M}m)`, 'danger');
+        btn.disabled = false;
+        btn.textContent = isCheckin ? '📍 Check-in' : '🏁 Check-out';
+        return;
+      }
     }
     const timeStr = nowTime();
     if (isCheckin) {
@@ -764,10 +768,11 @@ async function doShiftAction(shift) {
       const diffMin = (ch*60+cm) - (sh*60+sm);
       const late = diffMin > DB_CONFIG.LATE_GRACE_MINUTES;
       await apiCall('checkin', { empId: state.user.id, date: today(), time: timeStr, shift,
-        lat: gps.lat, lng: gps.lng, late, lateMin: Math.max(0, diffMin) });
+        lat: gps.lat, lng: gps.lng, late, lateMin: Math.max(0, diffMin), remote: isSunday });
       if (shift === 'morning') { d.morningCheckin = timeStr; d.morningLate = late; }
       else { d.afternoonCheckin = timeStr; d.afternoonLate = late; }
-      showToast(late ? `⚠️ Check-in ${shift==='morning'?'sáng':'chiều'} lúc ${timeStr} — trễ ${diffMin} phút` : `✅ Check-in ${shift==='morning'?'sáng':'chiều'} ${timeStr} — Đúng giờ!`, late ? 'warning' : 'success');
+      const prefix = isSunday ? '🏠 Online · ' : '';
+      showToast(late ? `⚠️ ${prefix}Check-in ${shift==='morning'?'sáng':'chiều'} lúc ${timeStr} — trễ ${diffMin} phút` : `✅ ${prefix}Check-in ${shift==='morning'?'sáng':'chiều'} ${timeStr} — Đúng giờ!`, late ? 'warning' : 'success');
     } else {
       // Check-out
       const endStr = shift === 'morning' ? DB_CONFIG.MORNING_END : DB_CONFIG.AFTERNOON_END;
@@ -779,12 +784,13 @@ async function doShiftAction(shift) {
         lat: gps.lat, lng: gps.lng, early, earlyMin: Math.max(0, earlyMin) });
       if (shift === 'morning') d.morningCheckout = timeStr;
       else d.afternoonCheckout = timeStr;
-      showToast(`✅ Check-out ${shift==='morning'?'sáng':'chiều'} lúc ${timeStr}`, 'success');
+      const outPrefix = isSunday ? '🏠 Online · ' : '';
+      showToast(`✅ ${outPrefix}Check-out ${shift==='morning'?'sáng':'chiều'} lúc ${timeStr}`, 'success');
     }
     localStorage.setItem(`todayData_${today()}`, JSON.stringify(d));
     renderHome();
   } catch(e) {
-    showToast('❌ Không lấy được GPS. Bật GPS và thử lại.', 'danger');
+    showToast(isSunday ? '❌ Lỗi check-in online. Thử lại!' : '❌ Không lấy được GPS. Bật GPS và thử lại.', 'danger');
     btn.disabled = false;
     btn.textContent = isCheckin ? '📍 Check-in' : '🏁 Check-out';
   }
