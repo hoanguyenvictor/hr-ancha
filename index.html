@@ -379,20 +379,17 @@
   </div>
 
   <div class="card">
-    <div class="card-title"><span class="icon">📖</span>Hướng Dẫn Setup Google Sheets</div>
-    <div id="setupGuide" style="font-size:0.83rem;line-height:1.7;color:var(--text)">
-      <p><b>Bước 1 — Tạo Google Sheet</b></p>
-      <p style="color:var(--muted);margin-bottom:10px">Mở Google Sheets, tạo file mới tên "HR System"</p>
-
-      <p><b>Bước 2 — Tạo Apps Script</b></p>
-      <p style="color:var(--muted);margin-bottom:10px">Trong Sheet: Extensions → Apps Script → paste code từ file <code>google-apps-script.js</code></p>
-
-      <p><b>Bước 3 — Deploy</b></p>
-      <p style="color:var(--muted);margin-bottom:10px">Deploy → New Deployment → Web App → Execute as Me → Anyone → Copy URL</p>
-
-      <p><b>Bước 4 — Điền URL</b></p>
-      <p style="color:var(--muted)">Paste URL vào ô "Google Apps Script URL" ở trên → Lưu</p>
+    <div class="card-title"><span class="icon">📌</span>Giao Việc Phát Sinh</div>
+    <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Giao nhiệm vụ phát sinh cho nhân viên — họ nhận thông báo ngay trong app và phải báo cáo lại Boss khi xong.</p>
+    <div class="form-group">
+      <label>Nhân viên phụ trách</label>
+      <select id="assignEmpSel" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);font-size:0.88rem"></select>
     </div>
+    <div class="form-group">
+      <label>Nội dung nhiệm vụ</label>
+      <textarea id="assignTaskDesc" rows="3" placeholder="VD: Tưới cây ngoài sân trước khi về, Lấy đồ ở tầng 3..." style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);font-size:0.88rem;box-sizing:border-box;resize:vertical"></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="assignTask()">📤 Giao Việc & Thông Báo</button>
   </div>
 </div>
 
@@ -1314,6 +1311,27 @@ function switchPage(name, btn) {
   if (name === 'schedule') renderScheduleTab();
   if (name === 'notifications') { loadNotifications(); loadAttendanceReports(); }
   if (name === 'diary') { window._bossDiaryFilter = window._bossDiaryFilter || 'day'; loadBossDiary(); }
+  if (name === 'settings') populateAssignEmpSel();
+}
+
+function populateAssignEmpSel() {
+  const sel = document.getElementById('assignEmpSel');
+  if (!sel || !employees.length) return;
+  sel.innerHTML = employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+}
+
+async function assignTask() {
+  const empId = document.getElementById('assignEmpSel').value;
+  const desc  = document.getElementById('assignTaskDesc').value.trim();
+  if (!desc) { showToast('⚠️ Chưa nhập nội dung nhiệm vụ', 'warning'); return; }
+  const emp = employees.find(e => String(e.id) === String(empId));
+  const res = await apiCall('assignTask', { empId, desc, date: today() });
+  if (res.ok) {
+    document.getElementById('assignTaskDesc').value = '';
+    showToast(`✅ Đã giao việc cho ${emp?.name || empId}`, 'success');
+  } else {
+    showToast('❌ Lỗi khi giao việc', 'error');
+  }
 }
 
 function switchSchedTab(tab) {

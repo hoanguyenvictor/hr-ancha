@@ -514,7 +514,7 @@ const AFTERNOON_TASKS = [
   { id: 'a1', name: 'Dọn dẹp cuối ngày', detail: 'Quét, lau sàn trước khi về' },
   { id: 'a2', name: 'Xếp hàng hoá gọn gàng', detail: 'Hàng hoá đúng vị trí, có nhãn mác rõ ràng' },
   { id: 'a3', name: 'Thu dọn dụng cụ đóng hàng', detail: 'Hộp, băng dính xếp vào đúng chỗ quy định' },
-  { id: 'a4', name: 'Tắt thiết bị điện', detail: 'Điều hoà, quạt, đèn (trừ camera)' },
+  { id: 'a4', name: 'Tắt thiết bị điện', detail: 'Máy tính, điều hoà, quạt, đèn (trừ camera)' },
   { id: 'a5', name: 'Khoá cửa, kiểm tra an ninh', detail: 'Cửa chính, cửa kho đều khoá' },
 ];
 const SUPPLY_ITEMS = [
@@ -947,6 +947,45 @@ async function doCheckout() {
 function renderChecklist() {
   document.getElementById('morningList').innerHTML = MORNING_TASKS.map(t => taskHTML(t)).join('');
   document.getElementById('afternoonList').innerHTML = AFTERNOON_TASKS.map(t => taskHTML(t)).join('');
+  loadAssignedTasks();
+}
+
+async function loadAssignedTasks() {
+  const el = document.getElementById('adhocList');
+  if (!el) return;
+  try {
+    const res = await apiCall('getAssignedTasks', { empId: state.user.id });
+    if (!res.ok || !res.data?.length) {
+      el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Chưa có nhiệm vụ phát sinh hôm nay</p>';
+      return;
+    }
+    el.innerHTML = res.data.map(t => `
+      <div style="padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="font-size:0.88rem;font-weight:600;margin-bottom:6px">📌 ${t.desc}</div>
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:8px">Giao lúc: ${t.bossDate}</div>
+        <div style="display:flex;gap:6px">
+          <input type="text" id="adhocNote_${t.id}" placeholder="Ghi chú khi hoàn thành..."
+            style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--border);font-size:0.82rem">
+          <button onclick="completeAdhocTask('${t.id}')"
+            style="background:var(--success);color:white;border:none;border-radius:8px;padding:6px 12px;font-size:0.8rem;font-weight:700;cursor:pointer;white-space:nowrap">
+            ✅ Xong
+          </button>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Chưa có nhiệm vụ phát sinh</p>';
+  }
+}
+
+async function completeAdhocTask(taskId) {
+  const note = document.getElementById(`adhocNote_${taskId}`)?.value?.trim() || '';
+  const res = await apiCall('completeAssignedTask', { id: taskId, empId: state.user.id, doneNote: note });
+  if (res.ok) {
+    showToast('✅ Đã báo cáo hoàn thành cho Boss!', 'success');
+    loadAssignedTasks();
+  } else {
+    showToast('❌ Lỗi khi gửi báo cáo', 'error');
+  }
 }
 
 function taskHTML(t) {

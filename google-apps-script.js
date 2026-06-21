@@ -183,6 +183,7 @@ const SHEETS = {
   PHOTOS:      'Photos',
   SUBMISSIONS:       'Submissions',
   RETURN_SUBS:       'ReturnSubmissions',
+  ASSIGNED_TASKS:    'AssignedTasks',
 };
 
 // ─── ENTRY POINT (GET — tránh CORS) ──────────────────────────────
@@ -254,6 +255,9 @@ function doGet(e) {
       case 'getAllReturns':          result = { ok: true, data: sheetData(SHEETS.RETURN_SUBS) }; break;
       case 'getBossNotifications':  result = getBossNotifications(); break;
       case 'markBossNotifRead':     result = markBossNotifRead(data); break;
+      case 'assignTask':            result = assignTask(data); break;
+      case 'completeAssignedTask':  result = completeAssignedTask(data); break;
+      case 'getAssignedTasks':      result = getAssignedTasks(data); break;
       case 'getEmpNotifications':   result = getEmpNotifications(data); break;
       case 'markEmpNotifRead':      result = markEmpNotifRead(data); break;
       case 'getPendingReturns':     result = getPendingReturns(data); break;
@@ -305,6 +309,7 @@ function initSheet(sheet, name) {
     [SHEETS.LOGS]:        ['ts','action','detail'],
     [SHEETS.SUBMISSIONS]:  ['id','empId','date','time','totalTasks','doneTasks','status','reviewedAt'],
     [SHEETS.RETURN_SUBS]: ['id','empId','date','time','type','orderId','amount','bankInfo','condition','photoShipper','photoActual','photoQR','count','orderIds','photoOrders','photoPancake','status','proofUrl','confirmedAt'],
+    [SHEETS.ASSIGNED_TASKS]: ['id','empId','bossDate','desc','status','doneTime','doneNote'],
   };
   if (headers[name]) sheet.getRange(1, 1, 1, headers[name].length).setValues([headers[name]]);
 }
@@ -879,6 +884,54 @@ function pushEmpNotification(empId, date, type, message) {
     sheet.appendRow(['empId','date','type','message','read']);
   }
   sheet.appendRow([empId, date, type, message, 'false']);
+}
+
+// ─── NHIỆM VỤ PHÁT SINH ───��──────────────────────────────────────
+function assignTask(data) {
+  const { empId, desc, date } = data;
+  const id = uid();
+  appendRow(SHEETS.ASSIGNED_TASKS, { id, empId, bossDate: date, desc, status: 'pending', doneTime: '', doneNote: '' });
+  pushEmpNotification(empId, date, 'assigned_task', `📌 Boss giao việc: ${desc}`);
+  return { ok: true, id };
+}
+
+function completeAssignedTask(data) {
+  const { id, empId, doneNote } = data;
+  const tz = Session.getScriptTimeZone();
+  const doneTime = Utilities.formatDate(new Date(), tz, 'HH:mm');
+  const date = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  const sheet = getSheet(SHEETS.ASSIGNED_TASKS);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const idIdx = headers.indexOf('id');
+  const statusIdx = headers.indexOf('status');
+  const doneTimeIdx = headers.indexOf('doneTime');
+  const doneNoteIdx = headers.indexOf('doneNote');
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][idIdx]) === String(id)) {
+      sheet.getRange(i+1, statusIdx+1).setValue('done');
+      sheet.getRange(i+1, doneTimeIdx+1).setValue(doneTime);
+      sheet.getRange(i+1, doneNoteIdx+1).setValue(doneNote || '');
+      break;
+    }
+  }
+  // Thông báo Boss
+  const emps = sheetData(SHEETS.EMPLOYEES);
+  const emp = emps.find(e => String(e.id) === String(empId));
+  const empName = emp ? emp.name : empId;
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let nSheet = ss.getSheetByName('BossNotifications');
+  if (!nSheet) { nSheet = ss.insertSheet('BossNotifications'); nSheet.appendRow(['date','type','message','read']); }
+  nSheet.appendRow([date, 'task_done', `✅ ${empName} hoàn thành việc phát sinh: ${doneNote || 'xong'}`, 'false']);
+  return { ok: true };
+}
+
+function getAssignedTasks(data) {
+  const { empId } = data;
+  const rows = sheetData(SHEETS.ASSIGNED_TASKS).filter(r =>
+    String(r.empId) === String(empId) && r.status === 'pending'
+  );
+  return { ok: true, data: rows };
 }
 
 function getEmpNotifications(data) {
