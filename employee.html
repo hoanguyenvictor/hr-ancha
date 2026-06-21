@@ -384,6 +384,18 @@
     </div>
   </div>
 
+  <div class="card" style="border:2px solid var(--primary)">
+    <div class="card-title" style="color:var(--primary)"><span class="icon">💵</span>Tổng Lương Dự Kiến Tháng Này</div>
+    <div id="salaryProjected">
+      <div style="text-align:center;padding:16px 0;color:var(--muted);font-size:0.85rem">Đang tính...</div>
+    </div>
+    <div style="margin-top:10px;padding:12px;background:linear-gradient(135deg,var(--primary),var(--secondary));border-radius:10px;text-align:center">
+      <div style="font-size:0.78rem;color:rgba(255,255,255,0.8);margin-bottom:4px">TỔNG DỰ KIẾN</div>
+      <div style="font-size:1.6rem;font-weight:800;color:white" id="totalProjected">—</div>
+      <div style="font-size:0.72rem;color:rgba(255,255,255,0.7);margin-top:4px">Cập nhật mỗi ngày cuối ngày 🔄</div>
+    </div>
+  </div>
+
   <div class="card" id="salarySlipCard" style="display:none">
     <div class="card-title"><span class="icon">💰</span>Phiếu Lương Đã Xác Nhận</div>
     <div id="salarySlipContent"></div>
@@ -1591,16 +1603,20 @@ async function confirmPing() {
 
 // ─── SALARY PAGE ───────────────────────────────────────
 async function renderSalary() {
-  // Lấy deductions thực từ backend (bao gồm auto-penalty từ hệ thống)
   let attendanceBonus = DB_CONFIG.BONUS_ATTENDANCE;
   let tasksBonus = DB_CONFIG.BONUS_TASKS;
   let deductions = [];
+  let otHours = 0, otPay = 0, salesBonus = 0, baseSalary = 0;
   try {
     const res = await apiCall('getEmpSalaryDetail', { empId: state.user.id, month: monthKey() });
     if (res.ok && res.data) {
       attendanceBonus = res.data.attendanceBonus;
-      tasksBonus = res.data.tasksBonus;
-      deductions = res.data.deductions || [];
+      tasksBonus      = res.data.tasksBonus;
+      deductions      = res.data.deductions  || [];
+      otHours         = res.data.otHours     || 0;
+      otPay           = res.data.otPay       || 0;
+      salesBonus      = res.data.salesBonus  || 0;
+      baseSalary      = res.data.baseSalary  || 0;
     }
   } catch(e) {}
   const totalBonus = attendanceBonus + tasksBonus;
@@ -1615,23 +1631,27 @@ async function renderSalary() {
       <span style="color:var(--danger);font-weight:700">-${formatVND(Number(d.amount)||50000)}</span>
     </div>`).join('') : `<p style="font-size:0.85rem;color:var(--muted)">Chưa có khoản trừ nào 🎉</p>`;
 
-  // OT summary
-  try {
-    const res = await apiCall('getOTSummary', { empId: state.user.id, month: monthKey() });
-    if (res.ok && res.data) {
-      document.getElementById('otHours').textContent = `${res.data.hours}h`;
-      document.getElementById('otPay').textContent = formatVND(res.data.hours * DB_CONFIG.OVERTIME_RATE);
-    }
-  } catch(e) {}
+  document.getElementById('otHours').textContent = `${otHours}h`;
+  document.getElementById('otPay').textContent   = formatVND(otPay);
+  if (salesBonus > 0) {
+    document.getElementById('bonusSales').textContent = formatVND(salesBonus);
+    document.getElementById('fillSales').style.width = '100%';
+  }
 
-  // Sales bonus
-  try {
-    const res = await apiCall('getSalesBonus', { empId: state.user.id, month: monthKey() });
-    if (res.ok && res.data?.amount) {
-      document.getElementById('bonusSales').textContent = formatVND(res.data.amount);
-      document.getElementById('fillSales').style.width = '100%';
-    }
-  } catch(e) {}
+  // Tổng lương dự kiến
+  const totalProjected = baseSalary + attendanceBonus + tasksBonus + salesBonus + otPay;
+  const row = (label, val, color) =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:0.85rem">
+      <span style="color:var(--muted)">${label}</span>
+      <span style="font-weight:700;color:${color}">${val}</span>
+    </div>`;
+  document.getElementById('salaryProjected').innerHTML =
+    row('Lương cơ bản', formatVND(baseSalary), 'var(--text)') +
+    row('Thưởng chuyên cần', formatVND(attendanceBonus), 'var(--success)') +
+    row('Thưởng hoàn thành nhiệm vụ', formatVND(tasksBonus), 'var(--success)') +
+    row('Thưởng doanh số', salesBonus > 0 ? formatVND(salesBonus) : 'Chờ Boss nhập', salesBonus > 0 ? 'var(--warning)' : 'var(--muted)') +
+    row(`Tăng ca (${otHours}h)`, formatVND(otPay), 'var(--warning)');
+  document.getElementById('totalProjected').textContent = formatVND(totalProjected);
 }
 
 // ─── UTILS ─────────────────────────────────────────────

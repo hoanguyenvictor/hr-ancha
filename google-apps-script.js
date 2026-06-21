@@ -141,6 +141,41 @@ function checkDailyAttendance() {
     ? `Tổng kết chấm công ${date}:\n${violations.join('\n')}\n💸 Mỗi vi phạm trừ 50.000đ thưởng chuyên cần`
     : `✅ Chấm công ${date} — Toàn bộ nhân viên hoàn thành đúng giờ!`;
   nSheet.appendRow([date, 'attendance', msg, 'false']);
+
+  // Gửi thông báo lương dự kiến cho từng nhân viên
+  notifyDailySalaryUpdate(employees, date, month);
+}
+
+function notifyDailySalaryUpdate(employees, date, month) {
+  const tz = Session.getScriptTimeZone();
+  const otRate = 26000;
+  employees.forEach(emp => {
+    const deductions = sheetData(SHEETS.DEDUCTIONS).filter(r =>
+      String(r.empId) === String(emp.id) && r.month === month
+    );
+    const attDeduct = deductions.filter(d => d.reason && (
+      d.reason.includes('late') || d.reason.includes('early') ||
+      d.reason.includes('absent') || d.reason.includes('Đi muộn') ||
+      d.reason.includes('Về sớm') || d.reason.includes('Không check')
+    )).reduce((s,d) => s + Number(d.amount||50000), 0);
+    const taskDeduct = deductions.filter(d => d.reason && (
+      d.reason.includes('Checklist') || d.reason.includes('checklist') || d.reason.includes('nhiệm vụ')
+    )).reduce((s,d) => s + Number(d.amount||50000), 0);
+
+    const attendanceBonus = Math.max(0, 300000 - attDeduct);
+    const tasksBonus      = Math.max(0, 500000 - taskDeduct);
+    const empSalary = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(emp.id) && s.month === month);
+    const salesBonus  = Number(empSalary?.salesBonus) || 0;
+    const baseSalary  = Number(emp.salary) || 0;
+    const schedOT = sheetData(SHEETS.SCHEDULE).filter(r =>
+      String(r.empId) === String(emp.id) && r.date && r.date.startsWith(month) && r.eveningStart
+    );
+    const otHours = Math.round(schedOT.reduce((s,r) => s + (Number(r.actualHours)||Number(r.plannedHours)||0), 0) * 10) / 10;
+    const total = baseSalary + attendanceBonus + tasksBonus + salesBonus + (otHours * otRate);
+    pushEmpNotification(emp.id, date, 'salary_update',
+      `💵 Lương dự kiến hôm nay (${date}): ${total.toLocaleString('vi-VN')}đ — Tăng ca: ${otHours}h · Thưởng: ${(attendanceBonus+tasksBonus).toLocaleString('vi-VN')}đ`
+    );
+  });
 }
 
 function sendTelegramPhoto(driveUrl, caption) {
@@ -858,7 +893,22 @@ function getEmpSalaryDetail(data) {
   );
   const attendanceBonus = Math.max(0, 300000 - attendanceDeductions.reduce((s,d)=>s+Number(d.amount||50000),0));
   const tasksBonus = Math.max(0, 500000 - taskDeductions.reduce((s,d)=>s+Number(d.amount||50000),0));
-  return { ok: true, data: { attendanceBonus, tasksBonus, deductions } };
+
+  // Lương cơ bản & thưởng doanh số
+  const emp = sheetData(SHEETS.EMPLOYEES).find(e => String(e.id) === String(empId));
+  const baseSalary = Number(emp?.salary) || 0;
+  const empSalary  = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(empId) && s.month === month);
+  const salesBonus = Number(empSalary?.salesBonus) || 0;
+
+  // Giờ tăng ca tháng này (Schedule actualHours + Overtime cũ)
+  const schedOT = sheetData(SHEETS.SCHEDULE).filter(r =>
+    String(r.empId) === String(empId) && r.date && r.date.startsWith(month) && r.eveningStart
+  );
+  const otRate = 26000;
+  const otHours = schedOT.reduce((s, r) => s + (Number(r.actualHours) || Number(r.plannedHours) || 0), 0);
+  const otPay = Math.round(otHours * 10) / 10 * otRate;
+
+  return { ok: true, data: { attendanceBonus, tasksBonus, deductions, baseSalary, salesBonus, otHours: Math.round(otHours*10)/10, otPay } };
 }
 
 function saveSalesBonus(data) {
