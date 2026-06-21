@@ -956,13 +956,25 @@ function getSchedule(data) {
   return { ok: true, data: result };
 }
 
+function fmtTime(val) {
+  if (!val || val === '') return '';
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, Session.getScriptTimeZone(), 'HH:mm');
+  }
+  return String(val).slice(0, 5);
+}
+
 function getWeeklySchedule(data) {
   const { weekStart } = data;
   const rows = sheetData(SHEETS.SCHEDULE).filter(r => r.weekStart === weekStart);
   const result = {};
   rows.forEach(r => {
     if (!result[r.empId]) result[r.empId] = {};
-    result[r.empId][r.day] = r;
+    result[r.empId][r.day] = {
+      ...r,
+      eveningStart: fmtTime(r.eveningStart),
+      eveningEnd:   fmtTime(r.eveningEnd),
+    };
   });
   return { ok: true, data: result };
 }
