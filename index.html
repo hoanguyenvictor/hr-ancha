@@ -226,16 +226,28 @@
 
 <!-- ── LỊCH & PHẠT ─────────────────────────────────── -->
 <div class="page" id="page-schedule">
-  <div class="card">
-    <div class="card-title"><span class="icon">📅</span>Lịch Làm Tuần Này</div>
-    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="shiftWeek(-1)" style="padding:6px 12px">◀ Tuần trước</button>
-      <span id="schedWeekLabel" style="font-weight:600;font-size:0.85rem;flex:1;text-align:center"></span>
-      <button class="btn btn-sm" onclick="shiftWeek(1)" style="padding:6px 12px">Tuần sau ▶</button>
-    </div>
-    <div id="schedTable" style="overflow-x:auto"></div>
+  <!-- Tab bar -->
+  <div style="display:flex;gap:6px;margin-bottom:14px;background:var(--card);border-radius:12px;padding:4px">
+    <button id="schtab-view"    onclick="switchSchedTab('view')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.75rem;font-weight:700;cursor:pointer;background:var(--primary);color:white">📅 Lịch Tuần</button>
+    <button id="schtab-edit"    onclick="switchSchedTab('edit')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.75rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">✏️ Sửa Lịch</button>
+    <button id="schtab-penalty" onclick="switchSchedTab('penalty')" style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.75rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">⚠️ Vi Phạm</button>
   </div>
 
+  <!-- Tab: Lịch Tuần -->
+  <div id="schedTab-view">
+    <div class="card">
+      <div class="card-title"><span class="icon">📅</span>Lịch Làm Tuần Này</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="shiftWeek(-1)" style="padding:6px 12px">◀ Tuần trước</button>
+        <span id="schedWeekLabel" style="font-weight:600;font-size:0.85rem;flex:1;text-align:center"></span>
+        <button class="btn btn-sm" onclick="shiftWeek(1)" style="padding:6px 12px">Tuần sau ▶</button>
+      </div>
+      <div id="schedTable" style="overflow-x:auto"></div>
+    </div>
+  </div>
+
+  <!-- Tab: Sửa Lịch -->
+  <div id="schedTab-edit" style="display:none">
   <div class="card">
     <div class="card-title"><span class="icon">✏️</span>Sửa Lịch Nhân Viên</div>
     <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Dùng khi nhân viên xin đổi lịch hoặc đăng ký trễ. Tick "phạt" nếu đăng ký muộn.</p>
@@ -278,7 +290,10 @@
     </div>
     <button class="btn btn-primary" onclick="saveEditSchedule()">💾 Cập Nhật Lịch</button>
   </div>
+  </div><!-- end schedTab-edit -->
 
+  <!-- Tab: Vi Phạm -->
+  <div id="schedTab-penalty" style="display:none">
   <div class="card">
     <div class="card-title"><span class="icon">⚠️</span>Quản Lý Vi Phạm Tháng Này</div>
     <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Mỗi lần vi phạm trừ 50.000đ. Chị có thể bỏ qua từng trường hợp nếu muốn.</p>
@@ -294,7 +309,9 @@
       <button class="btn btn-danger btn-sm" onclick="addPenalty()" style="padding:8px 16px">+ Thêm Phạt</button>
     </div>
   </div>
-</div>
+  </div><!-- end schedTab-penalty -->
+
+</div><!-- end page-schedule -->
 
 <!-- ── NHẬT KÝ ─────────────────────────────────────── -->
 <div class="page" id="page-diary">
@@ -1294,6 +1311,18 @@ function switchPage(name, btn) {
   if (name === 'schedule') renderScheduleTab();
   if (name === 'notifications') { loadNotifications(); loadAttendanceReports(); }
   if (name === 'diary') { window._bossDiaryFilter = window._bossDiaryFilter || 'day'; loadBossDiary(); }
+}
+
+function switchSchedTab(tab) {
+  ['view','edit','penalty'].forEach(t => {
+    const el = document.getElementById(`schedTab-${t}`);
+    const btn = document.getElementById(`schtab-${t}`);
+    if (!el || !btn) return;
+    const active = t === tab;
+    el.style.display = active ? '' : 'none';
+    btn.style.background = active ? 'var(--primary)' : 'transparent';
+    btn.style.color = active ? 'white' : 'var(--muted)';
+  });
 }
 
 function switchStaffTab(tab) {
