@@ -1060,14 +1060,17 @@ function renderSalaryTab() {
     <div style="border-radius:12px;border:1.5px solid var(--border);padding:14px;margin-bottom:10px">
       <div style="font-weight:800;margin-bottom:10px;font-size:0.95rem">${r.emp.name}</div>
       <div style="font-size:0.82rem">
-        ${salaryLine('Lương cứng', r.baseSalary)}
+        ${salaryLine('Lương cơ bản', r.baseSalary)}
         <div style="display:flex;justify-content:space-between;padding:3px 0;color:${r.otHours > 0 ? 'var(--text)' : 'var(--muted)'}">
           <span>🌙 Lương ngoài giờ (${r.otHours}h × ${formatVND(DB_CONFIG.OVERTIME_RATE)})</span>
           <b>${formatVND(r.otPay)}</b>
         </div>
         ${salaryLine('Thưởng chuyên cần', r.attendance)}
         ${salaryLine('Thưởng nhiệm vụ', r.tasks)}
-        ${salaryLine('Thưởng doanh số', r.sales)}
+        <div style="display:flex;justify-content:space-between;padding:3px 0;color:${r.sales > 0 ? 'var(--text)' : 'var(--muted)'}">
+          <span>💰 Thưởng doanh số</span>
+          <b>${r.sales > 0 ? formatVND(r.sales) : 'Chưa nhập'}</b>
+        </div>
         ${r.deductions > 0 ? salaryLine('Trừ vi phạm', -r.deductions, true) : ''}
       </div>
       <div style="border-top:2px solid var(--border);margin-top:10px;padding-top:10px;display:flex;justify-content:space-between">
