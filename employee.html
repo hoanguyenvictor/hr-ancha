@@ -1719,12 +1719,19 @@ async function loadEmpNotifications() {
 
 async function updateEmpNotifBadge() {
   if (!state.user) return;
-  const res = await apiCall('getMySubmissions', { empId: state.user.id });
-  const count = res.ok && res.data ? res.data.filter(s => s.status !== 'pending').length : 0;
-  const badge = document.getElementById('empNotifBadge');
+  const [resSubmit, resNotif] = await Promise.all([
+    apiCall('getMySubmissions', { empId: state.user.id }),
+    apiCall('getEmpNotifications', { empId: state.user.id }),
+  ]);
+  const reviewed = resSubmit.ok && resSubmit.data
+    ? resSubmit.data.filter(s => s.status !== 'pending').length : 0;
   const seen = Number(localStorage.getItem('empNotifSeen') || '0');
-  const unseen = count - seen;
-  if (unseen > 0) { badge.textContent = unseen; badge.classList.remove('hidden'); }
+  const unseenChecklist = Math.max(0, reviewed - seen);
+  const unseenSys = resNotif.ok && resNotif.data
+    ? resNotif.data.filter(n => n.read === 'false' || n.read === false).length : 0;
+  const total = unseenChecklist + unseenSys;
+  const badge = document.getElementById('empNotifBadge');
+  if (total > 0) { badge.textContent = total; badge.classList.remove('hidden'); }
   else badge.classList.add('hidden');
 }
 

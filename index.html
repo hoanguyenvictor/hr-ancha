@@ -405,8 +405,9 @@
   <button class="nav-item" onclick="switchPage('diary',this)">
     <span class="icon">📒</span><span>Nhật Ký</span>
   </button>
-  <button class="nav-item" onclick="switchPage('notifications',this)" id="navNotif">
+  <button class="nav-item" onclick="switchPage('notifications',this)" id="navNotif" style="position:relative">
     <span class="icon">🔔</span><span>Thông Báo</span>
+    <span id="bossNotifBadge" class="hidden" style="position:absolute;top:2px;right:4px;background:#ef4444;color:white;border-radius:10px;padding:1px 5px;font-size:0.6rem;font-weight:700;line-height:1.4"></span>
   </button>
   <button class="nav-item" onclick="switchPage('settings',this)">
     <span class="icon">⚙️</span><span>Cài Đặt</span>
@@ -1408,10 +1409,14 @@ async function loadNotifications() {
   if (total === 0) {
     el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted);text-align:center;padding:20px">🎉 Không có thông báo nào chờ xác nhận</p>';
     document.getElementById('notifBadge').classList.add('hidden');
+    const nb = document.getElementById('bossNotifBadge');
+    if (nb) nb.classList.add('hidden');
     return;
   }
   document.getElementById('notifBadge').textContent = total;
   document.getElementById('notifBadge').classList.remove('hidden');
+  const navBadge = document.getElementById('bossNotifBadge');
+  if (navBadge) { navBadge.textContent = total; navBadge.classList.remove('hidden'); }
 
   const checklistHTML = checklists.map(s => `
     <div style="border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
