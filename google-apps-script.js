@@ -168,9 +168,10 @@ function notifyDailySalaryUpdate(employees, date, month) {
     const salesBonus  = Number(empSalary?.salesBonus) || 0;
     const baseSalary  = Number(emp.salary) || 0;
     const schedOT = sheetData(SHEETS.SCHEDULE).filter(r =>
-      String(r.empId) === String(emp.id) && r.date && r.date.startsWith(month) && r.eveningStart
+      String(r.empId) === String(emp.id) && r.date && r.date.startsWith(month) &&
+      r.eveningStart && Number(r.actualHours) > 0
     );
-    const otHours = Math.round(schedOT.reduce((s,r) => s + (Number(r.actualHours)||Number(r.plannedHours)||0), 0) * 10) / 10;
+    const otHours = Math.round(schedOT.reduce((s,r) => s + Number(r.actualHours), 0) * 10) / 10;
     const total = baseSalary + attendanceBonus + tasksBonus + salesBonus + (otHours * otRate);
     pushEmpNotification(emp.id, date, 'salary_update',
       `💵 Lương dự kiến hôm nay (${date}): ${total.toLocaleString('vi-VN')}đ — Tăng ca: ${otHours}h · Thưởng: ${(attendanceBonus+tasksBonus).toLocaleString('vi-VN')}đ`
@@ -902,10 +903,11 @@ function getEmpSalaryDetail(data) {
 
   // Giờ tăng ca tháng này (Schedule actualHours + Overtime cũ)
   const schedOT = sheetData(SHEETS.SCHEDULE).filter(r =>
-    String(r.empId) === String(empId) && r.date && r.date.startsWith(month) && r.eveningStart
+    String(r.empId) === String(empId) && r.date && r.date.startsWith(month) &&
+    r.eveningStart && Number(r.actualHours) > 0
   );
   const otRate = 26000;
-  const otHours = schedOT.reduce((s, r) => s + (Number(r.actualHours) || Number(r.plannedHours) || 0), 0);
+  const otHours = schedOT.reduce((s, r) => s + Number(r.actualHours), 0);
   const otPay = Math.round(otHours * 10) / 10 * otRate;
 
   return { ok: true, data: { attendanceBonus, tasksBonus, deductions, baseSalary, salesBonus, otHours: Math.round(otHours*10)/10, otPay } };
