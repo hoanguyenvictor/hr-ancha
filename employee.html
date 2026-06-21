@@ -110,14 +110,34 @@
 
 <!-- ── CHECKLIST ─────────────────────────────────── -->
 <div class="page" id="page-checklist">
-  <div class="card">
-    <div class="card-title"><span class="icon">🌅</span>Buổi Sáng</div>
-    <div id="morningList"></div>
+  <!-- Tab bar -->
+  <div style="display:flex;gap:6px;margin-bottom:14px;background:var(--card);border-radius:12px;padding:4px">
+    <button id="ctab-tasks" onclick="switchChecklistTab('tasks')" style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.78rem;font-weight:700;cursor:pointer;background:var(--primary);color:white">✅ Checklist</button>
+    <button id="ctab-supply" onclick="switchChecklistTab('supply')" style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.78rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">📦 Kiểm Kho</button>
+    <button id="ctab-return" onclick="switchChecklistTab('return')" style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.78rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">🔄 Hàng Hoàn</button>
   </div>
-  <div class="card">
-    <div class="card-title"><span class="icon">🌆</span>Buổi Chiều</div>
-    <div id="afternoonList"></div>
+
+  <!-- Tab: Checklist -->
+  <div id="checklistTab-tasks">
+    <div class="card">
+      <div class="card-title"><span class="icon">🌅</span>Buổi Sáng</div>
+      <div id="morningList"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">🌆</span>Buổi Chiều</div>
+      <div id="afternoonList"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">📋</span>Nhiệm Vụ Phát Sinh</div>
+      <div id="adhocList">
+        <p style="font-size:0.85rem;color:var(--muted)">Chưa có nhiệm vụ phát sinh hôm nay</p>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="submitChecklist()" style="width:100%;margin-top:4px">✅ Xác nhận gửi Boss</button>
   </div>
+
+  <!-- Tab: Kiểm Kho -->
+  <div id="checklistTab-supply" style="display:none">
   <!-- ── KIỂM KHO (gộp vào checklist) ───────────────── -->
   <div class="card">
     <div class="card-title"><span class="icon">📦</span>Kiểm Dụng Cụ Đóng Hàng</div>
@@ -137,7 +157,10 @@
     </div>
     <button class="btn btn-primary" onclick="submitSupply()" style="margin-top:12px">💾 Lưu Báo Cáo & Gửi Boss</button>
   </div>
+  </div><!-- end checklistTab-supply -->
 
+  <!-- Tab: Hàng Hoàn -->
+  <div id="checklistTab-return" style="display:none">
   <!-- ── HÀNG HOÀN VỀ (gộp vào checklist) ─────────── -->
   <div class="card">
     <div class="card-title"><span class="icon">🔄</span>Báo Hàng Hoàn Về</div>
@@ -212,16 +235,9 @@
       <button class="btn btn-warning" onclick="submitReturnCarrier()">📥 Ghi Nhận & Gửi Boss</button>
     </div>
   </div>
+  </div><!-- end checklistTab-return -->
 
-  <!-- ── NHIỆM VỤ PHÁT SINH ─────────────────────────── -->
-  <div class="card">
-    <div class="card-title"><span class="icon">📋</span>Nhiệm Vụ Phát Sinh</div>
-    <div id="adhocList">
-      <p style="font-size:0.85rem;color:var(--muted)">Chưa có nhiệm vụ phát sinh hôm nay</p>
-    </div>
-  </div>
-  <button class="btn btn-primary" onclick="submitChecklist()" style="width:100%;margin-top:4px">✅ Xác nhận gửi Boss</button>
-</div>
+</div><!-- end page-checklist -->
 
 <!-- ── KHO (placeholder để không lỗi switchPage cũ) ── -->
 <div id="page-inventory" style="display:none"></div>
@@ -1411,6 +1427,18 @@ function buildScheduleForm() {
       </div>
     </div>`;
   }).join('');
+}
+
+function switchChecklistTab(tab) {
+  ['tasks','supply','return'].forEach(t => {
+    const el = document.getElementById(`checklistTab-${t}`);
+    const btn = document.getElementById(`ctab-${t}`);
+    if (!el || !btn) return;
+    const active = t === tab;
+    el.style.display = active ? '' : 'none';
+    btn.style.background = active ? 'var(--primary)' : 'transparent';
+    btn.style.color = active ? 'white' : 'var(--muted)';
+  });
 }
 
 function toggleEveningInputs(dayKey) {
