@@ -147,31 +147,16 @@ function checkDailyAttendance() {
 }
 
 function notifyDailySalaryUpdate(employees, date, month) {
-  const tz = Session.getScriptTimeZone();
   const otRate = 26000;
   employees.forEach(emp => {
     const deductions = sheetData(SHEETS.DEDUCTIONS).filter(r =>
       String(r.empId) === String(emp.id) && r.month === month
     );
-    const attDeduct = deductions.filter(d => d.reason && (
-      d.reason.includes('late') || d.reason.includes('early') ||
-      d.reason.includes('absent') || d.reason.includes('Đi muộn') ||
-      d.reason.includes('Về sớm') || d.reason.includes('Không check')
-    )).reduce((s,d) => s + Number(d.amount||50000), 0);
-    const taskDeduct = deductions.filter(d => d.reason && (
-      d.reason.includes('Checklist') || d.reason.includes('checklist') || d.reason.includes('nhiệm vụ')
-    )).reduce((s,d) => s + Number(d.amount||50000), 0);
-
-    const attendanceBonus = Math.max(0, 300000 - attDeduct);
-    const tasksBonus      = Math.max(0, 500000 - taskDeduct);
+    const { attendanceBonus, tasksBonus } = calcEmpBonus(deductions);
     const empSalary = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(emp.id) && s.month === month);
     const salesBonus  = Number(empSalary?.salesBonus) || 0;
     const baseSalary  = Number(emp.salary) || 0;
-    const schedOT = sheetData(SHEETS.SCHEDULE).filter(r =>
-      String(r.empId) === String(emp.id) && r.date && r.date.startsWith(month) &&
-      r.eveningStart && Number(r.actualHours) > 0
-    );
-    const otHours = Math.round(schedOT.reduce((s,r) => s + Number(r.actualHours), 0) * 10) / 10;
+    const otHours = calcOTHours(emp.id, month);
     const total = baseSalary + attendanceBonus + tasksBonus + salesBonus + (otHours * otRate);
     pushEmpNotification(emp.id, date, 'salary_update',
       `💵 Lương dự kiến hôm nay (${date}): ${total.toLocaleString('vi-VN')}đ — Tăng ca: ${otHours}h · Thưởng: ${(attendanceBonus+tasksBonus).toLocaleString('vi-VN')}đ`
@@ -811,57 +796,61 @@ function addDeduction(data) {
   return { ok: true };
 }
 
+// ─── SALARY HELPERS ───────────────────────────────────────────────
+const HOLIDAY_DATES = ['2026-02-15','2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20','2026-04-27'];
+const HOLIDAY_MMDD  = ['01-01','04-30','05-01','09-02'];
+function isHolidayDate(dateStr) {
+  return HOLIDAY_MMDD.includes(String(dateStr).slice(5)) || HOLIDAY_DATES.includes(dateStr);
+}
+
+// Tính OT hours cho 1 nhân viên: chỉ tính actualHours đã checkout, có nhân đôi ngày lễ
+function calcOTHours(empId, month) {
+  const schedOT = sheetData(SHEETS.SCHEDULE).filter(r =>
+    String(r.empId) === String(empId) && r.date && r.date.startsWith(month) &&
+    r.eveningStart && Number(r.actualHours) > 0
+  );
+  const otFromSched = schedOT.reduce((s, r) => {
+    const h = Number(r.actualHours);
+    return s + (isHolidayDate(r.date) ? h * 2 : h);
+  }, 0);
+  // Cộng thêm OT cũ từ sheet Overtime (nếu có)
+  const otOld = sheetData(SHEETS.OVERTIME).filter(o =>
+    String(o.empId) === String(empId) && o.date && o.date.startsWith(month) &&
+    (o.status === 'done' || o.status === 'approved')
+  ).reduce((s, o) => s + (Number(o.hours) || 0), 0);
+  return Math.round((otFromSched + otOld) * 10) / 10;
+}
+
+// Tính bonus/deduction cho 1 nhân viên
+function calcEmpBonus(empDeductions) {
+  const attDeduct = empDeductions.filter(d => d.reason && (
+    d.reason.includes('late') || d.reason.includes('early') ||
+    d.reason.includes('absent') || d.reason.includes('Đi muộn') ||
+    d.reason.includes('Về sớm') || d.reason.includes('Không check')
+  )).reduce((s,d) => s + Number(d.amount||50000), 0);
+  const taskDeduct = empDeductions.filter(d => d.reason && (
+    d.reason.includes('Checklist') || d.reason.includes('checklist') || d.reason.includes('nhiệm vụ')
+  )).reduce((s,d) => s + Number(d.amount||50000), 0);
+  return {
+    attendanceBonus: Math.max(0, 300000 - attDeduct),
+    tasksBonus:      Math.max(0, 500000 - taskDeduct),
+  };
+}
+
 // ─── SALARY ───────────────────────────────────────────────────────
 function getSalaryData(data) {
   const { month } = data;
   const employees = sheetData(SHEETS.EMPLOYEES);
   const deductions = sheetData(SHEETS.DEDUCTIONS).filter(r => r.month === month);
   const salaries = sheetData(SHEETS.SALARY).filter(r => r.month === month);
-  const overtime = sheetData(SHEETS.OVERTIME).filter(r =>
-    r.date && r.date.startsWith(month) && (r.status === 'done' || r.status === 'approved')
-  );
   const checkins = sheetData(SHEETS.CHECKIN).filter(r => r.date && r.date.startsWith(month));
-  // Lấy ca ngoài giờ từ Schedule (hasOT = TRUE, date trong tháng)
-  const scheduleOT = sheetData(SHEETS.SCHEDULE).filter(r =>
-    r.date && r.date.startsWith(month) && String(r.hasOT) === 'true'
-  );
 
   const result = {};
   employees.forEach(emp => {
     const empDeductions = deductions.filter(d => String(d.empId) === String(emp.id));
     const empSalary = salaries.find(s => String(s.empId) === String(emp.id));
-    const empOT = overtime.filter(o => String(o.empId) === String(emp.id));
-    const otHoursOld = empOT.reduce((s, o) => s + (Number(o.hours)||0), 0);
-    // Giờ ngoài giờ từ Schedule: ưu tiên actualHours, fallback plannedHours
-    const empSchedOT = scheduleOT.filter(r => String(r.empId) === String(emp.id));
-    const otHoursNew = empSchedOT.reduce((s, r) => {
-      const h = Number(r.actualHours) || Number(r.plannedHours) || 0;
-      // Ngày lễ nhân đôi (kiểm tra đơn giản các ngày cố định)
-      const mmdd = String(r.date).slice(5);
-      const isHoliday = ['01-01','04-30','05-01','09-02'].includes(mmdd) ||
-        ['2026-02-15','2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20','2026-04-27'].includes(r.date);
-      return s + (isHoliday ? h * 2 : h);
-    }, 0);
-    const otHours = otHoursOld + otHoursNew;
-
-    // Thưởng chuyên cần: trừ 50.000 mỗi vi phạm (trễ, về sớm, thiếu check-in/out)
-    const attendanceDeductions = empDeductions.filter(d =>
-      d.reason && (
-        d.reason.includes('late') ||
-        d.reason.includes('early') ||
-        d.reason.includes('absent') ||
-        d.reason.includes('Đi muộn') ||
-        d.reason.includes('Về sớm') ||
-        d.reason.includes('Không check')
-      )
-    );
-    const attendanceBonus = Math.max(0, 300000 - attendanceDeductions.reduce((s,d)=>s+Number(d.amount||50000),0));
-
-    // Thưởng nhiệm vụ: trừ 50.000 mỗi lần checklist không đạt
-    const taskDeductions = empDeductions.filter(d =>
-      d.reason && (d.reason.includes('Checklist') || d.reason.includes('checklist') || d.reason.includes('nhiệm vụ'))
-    );
-    const taskBonus = Math.max(0, 500000 - taskDeductions.reduce((s,d)=>s+Number(d.amount||50000),0));
+    const otHours = calcOTHours(emp.id, month);
+    const { attendanceBonus, tasksBonus: taskBonus } = calcEmpBonus(empDeductions);
 
     result[emp.id] = {
       baseSalary: Number(emp.salary) || 0,
@@ -882,18 +871,7 @@ function getEmpSalaryDetail(data) {
   const deductions = sheetData(SHEETS.DEDUCTIONS).filter(r =>
     r.month === month && String(r.empId) === String(empId)
   );
-  const attendanceDeductions = deductions.filter(d =>
-    d.reason && (
-      d.reason.includes('late') || d.reason.includes('early') ||
-      d.reason.includes('absent') || d.reason.includes('Đi muộn') ||
-      d.reason.includes('Về sớm') || d.reason.includes('Không check')
-    )
-  );
-  const taskDeductions = deductions.filter(d =>
-    d.reason && (d.reason.includes('Checklist') || d.reason.includes('checklist') || d.reason.includes('nhiệm vụ'))
-  );
-  const attendanceBonus = Math.max(0, 300000 - attendanceDeductions.reduce((s,d)=>s+Number(d.amount||50000),0));
-  const tasksBonus = Math.max(0, 500000 - taskDeductions.reduce((s,d)=>s+Number(d.amount||50000),0));
+  const { attendanceBonus, tasksBonus } = calcEmpBonus(deductions);
 
   // Lương cơ bản & thưởng doanh số
   const emp = sheetData(SHEETS.EMPLOYEES).find(e => String(e.id) === String(empId));
@@ -901,13 +879,9 @@ function getEmpSalaryDetail(data) {
   const empSalary  = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(empId) && s.month === month);
   const salesBonus = Number(empSalary?.salesBonus) || 0;
 
-  // Giờ tăng ca tháng này (Schedule actualHours + Overtime cũ)
-  const schedOT = sheetData(SHEETS.SCHEDULE).filter(r =>
-    String(r.empId) === String(empId) && r.date && r.date.startsWith(month) &&
-    r.eveningStart && Number(r.actualHours) > 0
-  );
+  // Giờ tăng ca (dùng helper chung: actualHours > 0, ngày lễ ×2, cộng Overtime cũ)
   const otRate = 26000;
-  const otHours = schedOT.reduce((s, r) => s + Number(r.actualHours), 0);
+  const otHours = calcOTHours(empId, month);
   const otPay = Math.round(otHours * 10) / 10 * otRate;
 
   return { ok: true, data: { attendanceBonus, tasksBonus, deductions, baseSalary, salesBonus, otHours: Math.round(otHours*10)/10, otPay } };
