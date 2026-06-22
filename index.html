@@ -256,7 +256,7 @@
   <div id="schedTab-leave" style="display:none">
     <div class="card">
       <div class="card-title"><span class="icon">🏥</span>Đơn Xin Nghỉ Phép</div>
-      <div id="leaveRequestList"><p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p></div>
+      <div id="leaveRequestListSched"><p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p></div>
     </div>
   </div>
 
@@ -1567,14 +1567,15 @@ function switchSchedTab(tab) {
 }
 
 async function loadLeaveRequestsTab() {
-  const el = document.getElementById('leaveRequestList');
+  const el = document.getElementById('leaveRequestListSched');
+  if (!el) return;
   el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p>';
   const res = await apiCall('getLeaveRequests');
   if (!res.ok || !res.data?.length) {
     el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Chưa có đơn xin nghỉ nào.</p>';
     return;
   }
-  const employees = state.employees || [];
+  const employees = (typeof state !== 'undefined' && state.employees) ? state.employees : (window.employees || []);
   const rows = [...res.data].sort((a,b) => (b.date||'').localeCompare(a.date||''));
   el.innerHTML = rows.map(r => {
     const emp = employees.find(e => String(e.id) === String(r.empId));
