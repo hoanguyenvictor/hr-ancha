@@ -467,7 +467,13 @@ function handleCheckin(data) {
   const empName = emp ? emp.name : empId;
   const shiftLabel = shiftKey === 'morning' ? '☀️ Ca sáng' : shiftKey === 'afternoon' ? '🌆 Ca chiều' : '🌙 Tăng ca';
   const lateNote = late ? ` ⚠️ Trễ ${lateMin} phút` : ' ✅';
-  sendTelegram(`📍 <b>Check-in</b>\n👤 ${empName}\n${shiftLabel} · ${time}${lateNote}\n📅 ${date}`);
+  const msg = `📍 <b>Check-in</b>\n👤 ${empName}\n${shiftLabel} · ${time}${lateNote}\n📅 ${date}`;
+  sendTelegram(msg);
+  // Thông báo trong app boss
+  const ss2 = SpreadsheetApp.getActiveSpreadsheet();
+  let nSheet = ss2.getSheetByName('BossNotifications');
+  if (!nSheet) { nSheet = ss2.insertSheet('BossNotifications'); nSheet.appendRow(['date','type','message','read']); }
+  nSheet.appendRow([date, 'checkin', `📍 ${empName} check-in ${shiftLabel} lúc ${time}${lateNote}`, 'false']);
   return { ok: true };
 }
 

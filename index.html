@@ -760,23 +760,25 @@ function empRowHTML(emp) {
   const done = Object.values(r.checklist || {}).filter(Boolean).length;
   const alerts = buildEmpAlerts(emp, r);
 
-  const ciMorning = r.morningCheckin
-    ? `☀️ ${r.morningCheckin}${r.morningLate ? ' ⚠️' : ' ✅'}${r.morningCheckout ? ' → ' + r.morningCheckout : ' (chưa out)'}`
-    : '☀️ ❌ Chưa vào';
-  const ciAfternoon = r.afternoonCheckin
-    ? `🌤 ${r.afternoonCheckin}${r.afternoonLate ? ' ⚠️' : ' ✅'}${r.afternoonCheckout ? ' → ' + r.afternoonCheckout : ' (chưa out)'}`
-    : '🌤 ❌ Chưa vào';
+  const caLine = (icon, inTime, late, outTime) => {
+    if (!inTime) return `${icon} ❌ Chưa vào`;
+    return `${icon} ${inTime}${late?' ⚠️':' ✅'}${outTime?' → '+outTime:' (chưa out)'}`;
+  };
+  const lines = [
+    caLine('☀️', r.morningCheckin, r.morningLate, r.morningCheckout),
+    caLine('🌆', r.afternoonCheckin, r.afternoonLate, r.afternoonCheckout),
+    ...(r.activeShift ? [caLine('🌙', r.eveningCheckin, false, r.eveningCheckout)] : [])
+  ];
 
   const initials = emp.name.split(' ').slice(-2).map(w=>w[0]).join('').toUpperCase();
   return `<div class="emp-row" onclick="showEmpDetail('${emp.id}')">
     <div class="avatar" style="background:${emp.color||'#667eea'}">${initials}</div>
     <div class="emp-info">
       <div class="emp-name">${emp.name}</div>
-      <div class="emp-status" style="font-size:0.75rem">${ciMorning} &nbsp;|&nbsp; ${ciAfternoon}</div>
+      ${lines.map(l => `<div class="emp-status" style="font-size:0.75rem">${l}</div>`).join('')}
       <div class="emp-status" style="font-size:0.75rem;margin-top:2px">✅ Checklist: ${done}/${allTasks} việc</div>
       <div class="emp-badges">
         ${alerts.map(a => `<span class="badge badge-${a.type}" style="font-size:0.65rem">${a.short}</span>`).join('')}
-        ${r.activeShift ? '<span class="badge badge-warning" style="font-size:0.65rem">🌙 Ca tối</span>' : ''}
       </div>
     </div>
     <span style="color:var(--muted);font-size:0.8rem">›</span>
@@ -1658,17 +1660,24 @@ async function loadBossDiary() {
   const html = dates.map(date => {
     const isToday = date === today();
     const empRows = emps.filter(e => e.role !== 'boss').map(emp => {
-      const ci = checkins.filter(r => r.empId === emp.id && r.date === date);
-      const checkin  = ci.find(r => r.type === 'in' || r.checkIn);
-      const checkout = ci.find(r => r.type === 'out' || r.checkOut);
-      const sub = subs.find(r => r.empId === emp.id && r.date === date);
-      const sup = supplies.find(r => r.empId === emp.id && r.date === date);
-      const rets = returns_.filter(r => r.empId === emp.id && r.date === date);
+      const ci = checkins.filter(r => String(r.empId) === String(emp.id) && r.date === date);
+      const morning   = ci.find(r => (r.shift || 'morning') === 'morning');
+      const afternoon = ci.find(r => r.shift === 'afternoon');
+      const evening   = ci.find(r => r.shift === 'evening');
+      const sub = subs.find(r => String(r.empId) === String(emp.id) && r.date === date);
+      const sup = supplies.find(r => String(r.empId) === String(emp.id) && r.date === date);
+      const rets = returns_.filter(r => String(r.empId) === String(emp.id) && r.date === date);
 
-      const ciIcon  = checkin  ? '✅' : '❌';
-      const coIcon  = checkout ? '✅' : (checkin ? '⏳' : '❌');
+      const caRow = (icon, label, row) => {
+        if (!row) return `<div style="font-size:0.8rem;color:var(--muted)">${icon} ${label}: ❌ Chưa vào</div>`;
+        const late = row.late === 'TRUE' || row.late === true;
+        const ci = row.checkinTime || '?';
+        const co = row.checkoutTime ? ` → ${row.checkoutTime}` : ' (chưa out)';
+        return `<div style="font-size:0.8rem">${icon} ${label}: ${late?'⚠️':'✅'} ${ci}${co}</div>`;
+      };
+
       const clIcon  = !sub ? '—' : sub.status==='approved' ? '✅' : sub.status==='rejected' ? '❌' : '⏳';
-      const clLabel = !sub ? 'Chưa gửi' : sub.status==='approved' ? `Đạt (${sub.doneTasks}/${sub.totalTasks})` : sub.status==='rejected' ? 'Không đạt' : `Chờ xác nhận (${sub.doneTasks}/${sub.totalTasks})`;
+      const clLabel = !sub ? 'Chưa gửi' : sub.status==='approved' ? `Đạt (${sub.doneTasks}/${sub.totalTasks})` : sub.status==='rejected' ? 'Không đạt' : `Chờ (${sub.doneTasks}/${sub.totalTasks})`;
       const supIcon = sup ? '✅' : '—';
       const retSummary = rets.length ? rets.map(r => {
         const icon = r.status==='confirmed'?'✅':r.status==='rejected'?'❌':'⏳';
@@ -1677,11 +1686,12 @@ async function loadBossDiary() {
 
       return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">
         <div style="font-weight:700;font-size:0.85rem;margin-bottom:6px">👤 ${emp.name}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.8rem">
-          <div>🕐 Check-in: ${ciIcon} ${checkin ? (checkin.checkIn||checkin.time||'') : 'Chưa'}</div>
-          <div>🕔 Check-out: ${coIcon} ${checkout ? (checkout.checkOut||checkout.time||'') : (checkin?'Chưa':'—')}</div>
+        ${caRow('☀️','Ca sáng', morning)}
+        ${caRow('🌆','Ca chiều', afternoon)}
+        ${evening ? caRow('🌙','Ca tối', evening) : ''}
+        <div style="font-size:0.8rem;margin-top:4px;display:grid;grid-template-columns:1fr 1fr;gap:4px">
           <div>✅ Checklist: ${clIcon} ${clLabel}</div>
-          <div>📦 Kho: ${supIcon} ${sup?'Đã kiểm':'Không có'}</div>
+          <div>📦 Kho: ${supIcon} ${sup?'Đã kiểm':'—'}</div>
         </div>
         ${rets.length ? `<div style="font-size:0.8rem;margin-top:4px">🔄 Hoàn hàng: ${retSummary}</div>` : ''}
       </div>`;
