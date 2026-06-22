@@ -879,16 +879,10 @@ async function doShiftAction(shift) {
           DB_CONFIG.OFFICE_LNG = locRes.lng;
         }
       } catch(e) {}
-      gps = await checkInOffice();
+      try { gps = await checkInOffice(); } catch(e) { gps = { ok: false, distance: 0, lat: null, lng: null }; }
       if (!gps.ok) {
-        const officeLat = (parseFloat(localStorage.getItem('officeLat')) || DB_CONFIG.OFFICE_LAT).toFixed(4);
-        const officeLng = (parseFloat(localStorage.getItem('officeLng')) || DB_CONFIG.OFFICE_LNG).toFixed(4);
-        const empLat = gps.lat ? gps.lat.toFixed(4) : '?';
-        const empLng = gps.lng ? gps.lng.toFixed(4) : '?';
-        showToast(`❌ Cách VP ${gps.distance}m | GPS bạn: ${empLat},${empLng} | VP: ${officeLat},${officeLng}`, 'danger');
-        btn.disabled = false;
-        btn.textContent = isCheckin ? '📍 Check-in' : '🏁 Check-out';
-        return;
+        // Cảnh báo nhưng vẫn cho check-in — GPS trong nhà không ổn định
+        showToast(`⚠️ GPS cách VP ${gps.distance}m — Ghi nhận vị trí để Boss kiểm tra`, 'warning');
       }
     }
     const timeStr = nowTime();
