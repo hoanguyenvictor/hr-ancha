@@ -228,9 +228,10 @@
 <div class="page" id="page-schedule">
   <!-- Tab bar -->
   <div style="display:flex;gap:6px;margin-bottom:14px;background:var(--card);border-radius:12px;padding:4px">
-    <button id="schtab-view"    onclick="switchSchedTab('view')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.75rem;font-weight:700;cursor:pointer;background:var(--primary);color:white">📅 Lịch Tuần</button>
-    <button id="schtab-edit"    onclick="switchSchedTab('edit')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.75rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">✏️ Sửa Lịch</button>
-    <button id="schtab-penalty" onclick="switchSchedTab('penalty')" style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.75rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">⚠️ Vi Phạm</button>
+    <button id="schtab-view"    onclick="switchSchedTab('view')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.72rem;font-weight:700;cursor:pointer;background:var(--primary);color:white">📅 Lịch Tuần</button>
+    <button id="schtab-edit"    onclick="switchSchedTab('edit')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.72rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">✏️ Sửa Lịch</button>
+    <button id="schtab-penalty" onclick="switchSchedTab('penalty')" style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.72rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">⚠️ Vi Phạm</button>
+    <button id="schtab-assign"  onclick="switchSchedTab('assign')"  style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.72rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">📌 Giao Việc</button>
   </div>
 
   <!-- Tab: Lịch Tuần -->
@@ -311,6 +312,23 @@
   </div>
   </div><!-- end schedTab-penalty -->
 
+  <!-- Tab: Giao Việc -->
+  <div id="schedTab-assign" style="display:none">
+    <div class="card">
+      <div class="card-title"><span class="icon">📌</span>Giao Việc Phát Sinh</div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Giao nhiệm vụ phát sinh cho nhân viên — họ nhận thông báo ngay trong app và phải báo cáo lại Boss khi xong.</p>
+      <div class="form-group">
+        <label>Nhân viên phụ trách</label>
+        <select id="assignEmpSel" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);font-size:0.88rem"></select>
+      </div>
+      <div class="form-group">
+        <label>Nội dung nhiệm vụ</label>
+        <textarea id="assignTaskDesc" rows="3" placeholder="VD: Tưới cây ngoài sân trước khi về, Lấy đồ ở tầng 3..." style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);font-size:0.88rem;box-sizing:border-box;resize:vertical"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="assignTask()">📤 Giao Việc & Thông Báo</button>
+    </div>
+  </div><!-- end schedTab-assign -->
+
 </div><!-- end page-schedule -->
 
 <!-- ── NHẬT KÝ ─────────────────────────────────────── -->
@@ -351,7 +369,6 @@
     <button id="setab-config"  onclick="switchSettingsTab('config')"  style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.7rem;font-weight:700;cursor:pointer;background:var(--primary);color:white">⚙️ Cấu Hình</button>
     <button id="setab-tasks"   onclick="switchSettingsTab('tasks')"   style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.7rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">📋 Nhiệm Vụ</button>
     <button id="setab-link"    onclick="switchSettingsTab('link')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.7rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">🔗 Link App</button>
-    <button id="setab-assign"  onclick="switchSettingsTab('assign')"  style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.7rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">📌 Giao Việc</button>
   </div>
 
   <!-- Tab: Cấu Hình -->
@@ -429,22 +446,6 @@
     </div>
   </div>
 
-  <!-- Tab: Giao Việc -->
-  <div id="settingsTab-assign" style="display:none">
-    <div class="card">
-      <div class="card-title"><span class="icon">📌</span>Giao Việc Phát Sinh</div>
-      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:12px">Giao nhiệm vụ phát sinh cho nhân viên — họ nhận thông báo ngay trong app và phải báo cáo lại Boss khi xong.</p>
-      <div class="form-group">
-        <label>Nhân viên phụ trách</label>
-        <select id="assignEmpSel" style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);font-size:0.88rem"></select>
-      </div>
-      <div class="form-group">
-        <label>Nội dung nhiệm vụ</label>
-        <textarea id="assignTaskDesc" rows="3" placeholder="VD: Tưới cây ngoài sân trước khi về, Lấy đồ ở tầng 3..." style="width:100%;padding:8px;border-radius:8px;border:1.5px solid var(--border);font-size:0.88rem;box-sizing:border-box;resize:vertical"></textarea>
-      </div>
-      <button class="btn btn-primary" onclick="assignTask()">📤 Giao Việc & Thông Báo</button>
-    </div>
-  </div>
 </div>
 
 <!-- BOTTOM NAV -->
@@ -1453,7 +1454,7 @@ async function assignTask() {
 }
 
 function switchSettingsTab(tab) {
-  ['config','tasks','link','assign'].forEach(t => {
+  ['config','tasks','link'].forEach(t => {
     const el  = document.getElementById(`settingsTab-${t}`);
     const btn = document.getElementById(`setab-${t}`);
     if (!el || !btn) return;
@@ -1462,11 +1463,10 @@ function switchSettingsTab(tab) {
     btn.style.background = active ? 'var(--primary)' : 'transparent';
     btn.style.color      = active ? 'white' : 'var(--muted)';
   });
-  if (tab === 'assign') populateAssignEmpSel();
 }
 
 function switchSchedTab(tab) {
-  ['view','edit','penalty'].forEach(t => {
+  ['view','edit','penalty','assign'].forEach(t => {
     const el = document.getElementById(`schedTab-${t}`);
     const btn = document.getElementById(`schtab-${t}`);
     if (!el || !btn) return;
@@ -1475,6 +1475,7 @@ function switchSchedTab(tab) {
     btn.style.background = active ? 'var(--primary)' : 'transparent';
     btn.style.color = active ? 'white' : 'var(--muted)';
   });
+  if (tab === 'assign') populateAssignEmpSel();
 }
 
 function switchStaffTab(tab) {
