@@ -274,6 +274,7 @@ function doGet(e) {
       case 'approveDay':          result = approveDay(data); break;
       case 'registerSchedule':    result = registerSchedule(data); break;
       case 'getSchedule':         result = getSchedule(data); break;
+      case 'getAllSchedule':      result = getAllSchedule(data); break;
       case 'getWeeklySchedule':   result = getWeeklySchedule(data); break;
       case 'approveShiftHours':   result = approveShiftHours(data); break;
       case 'startOTShift':        result = startOTShift(data); break;
@@ -1271,6 +1272,18 @@ function registerSchedule(data) {
   nSheet.appendRow([today, 'schedule', `📅 ${empName} vừa hoàn thành đăng ký lịch làm tuần ${weekStart}`, 'false']);
   log('SCHEDULE', `${empId} đăng ký lịch tuần ${weekStart}`);
   return { ok: true };
+}
+
+// Trả về lịch đăng ký của tất cả nhân viên, dedup lấy lần cuối mỗi ngày
+function getAllSchedule(data) {
+  const { from, to } = data || {};
+  var all = sheetData(SHEETS.SCHEDULE);
+  if (from) all = all.filter(function(r) { return String(r.date) >= String(from); });
+  if (to)   all = all.filter(function(r) { return String(r.date) <= String(to); });
+  // Dedup: mỗi empId+date lấy dòng cuối
+  var map = {};
+  all.forEach(function(r) { map[String(r.empId) + '_' + String(r.date)] = r; });
+  return { ok: true, data: Object.values(map) };
 }
 
 function getSchedule(data) {

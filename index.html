@@ -1658,39 +1658,53 @@ async function loadBossDiary() {
   }
   dates = dates.reverse();
 
-  const [resEmps, resCheckin, resSubs, resSup, resRets] = await Promise.all([
+  const from = dates[dates.length - 1]; // ngày xa nhất (dates đã reverse)
+  const to   = dates[0];
+  const [resEmps, resCheckin, resSubs, resSup, resRets, resSched] = await Promise.all([
     apiCall('getEmployees', {}),
     apiCall('getAllCheckin', {}),
     apiCall('getAllSubmissions', {}),
     apiCall('getAllSupply', {}),
     apiCall('getAllReturns', {}),
+    apiCall('getAllSchedule', { from, to }),
   ]);
 
-  const emps     = resEmps.ok     ? (resEmps.data     || []) : [];
-  const checkins = resCheckin.ok  ? (resCheckin.data  || []) : [];
-  const subs     = resSubs.ok     ? (resSubs.data     || []) : [];
-  const supplies = resSup.ok      ? (resSup.data      || []) : [];
-  const returns_ = resRets.ok     ? (resRets.data     || []) : [];
+  const emps      = resEmps.ok    ? (resEmps.data    || []) : [];
+  const checkins  = resCheckin.ok ? (resCheckin.data || []) : [];
+  const subs      = resSubs.ok    ? (resSubs.data    || []) : [];
+  const supplies  = resSup.ok     ? (resSup.data     || []) : [];
+  const returns_  = resRets.ok    ? (resRets.data    || []) : [];
+  const schedules = resSched.ok   ? (resSched.data   || []) : [];
 
   const tick = (v, ok, pending) => ok ? `<span style="color:var(--success);font-weight:700">${v}</span>` : pending ? `<span style="color:var(--warning)">${v}</span>` : `<span style="color:var(--danger)">${v}</span>`;
 
   const html = dates.map(date => {
     const isToday = date === today();
     const empRows = emps.filter(e => e.role !== 'boss').map(emp => {
-      const ci = checkins.filter(r => String(r.empId) === String(emp.id) && r.date === date);
+      const ci   = checkins.filter(r => String(r.empId) === String(emp.id) && r.date === date);
+      const sched = schedules.find(r => String(r.empId) === String(emp.id) && r.date === date);
+
+      // Xác định ca đã đăng ký từ lịch
+      const shift      = sched ? (sched.shift || 'fullday') : null;
+      const hasMorning   = !shift || shift === 'morning'   || shift === 'fullday' || shift === 'full';
+      const hasAfternoon = !shift || shift === 'afternoon' || shift === 'fullday' || shift === 'full';
+      const hasEvening   = sched && (sched.hasOT === 'true' || sched.hasOT === true || sched.eveningStart);
+
       const morning   = ci.find(r => (r.shift || 'morning') === 'morning');
       const afternoon = ci.find(r => r.shift === 'afternoon');
       const evening   = ci.find(r => r.shift === 'evening');
-      const sub = subs.find(r => String(r.empId) === String(emp.id) && r.date === date);
-      const sup = supplies.find(r => String(r.empId) === String(emp.id) && r.date === date);
+
+      const sub  = subs.find(r => String(r.empId) === String(emp.id) && r.date === date);
+      const sup  = supplies.find(r => String(r.empId) === String(emp.id) && r.date === date);
       const rets = returns_.filter(r => String(r.empId) === String(emp.id) && r.date === date);
 
-      const caRow = (icon, label, row) => {
-        if (!row) return `<div style="font-size:0.8rem;color:var(--muted)">${icon} ${label}: ❌ Chưa vào</div>`;
+      const caRow = (icon, label, row, scheduled) => {
+        if (!scheduled) return '';
+        if (!row) return `<div style="font-size:0.8rem;color:var(--danger)">${icon} ${label}: ❌ Chưa vào</div>`;
         const late = row.late === 'TRUE' || row.late === true;
-        const ci = row.checkinTime || '?';
-        const co = row.checkoutTime ? ` → ${row.checkoutTime}` : ' (chưa out)';
-        return `<div style="font-size:0.8rem">${icon} ${label}: ${late?'⚠️':'✅'} ${ci}${co}</div>`;
+        const cin  = row.checkinTime || '?';
+        const co   = row.checkoutTime ? ` → ${row.checkoutTime}` : ' <span style="color:var(--warning)">(chưa out)</span>';
+        return `<div style="font-size:0.8rem">${icon} ${label}: ${late?'⚠️':'✅'} ${cin}${co}</div>`;
       };
 
       const clIcon  = !sub ? '—' : sub.status==='approved' ? '✅' : sub.status==='rejected' ? '❌' : '⏳';
@@ -1703,9 +1717,9 @@ async function loadBossDiary() {
 
       return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px">
         <div style="font-weight:700;font-size:0.85rem;margin-bottom:6px">👤 ${emp.name}</div>
-        ${caRow('☀️','Ca sáng', morning)}
-        ${caRow('🌆','Ca chiều', afternoon)}
-        ${evening ? caRow('🌙','Ca tối', evening) : ''}
+        ${caRow('☀️','Ca sáng', morning, hasMorning)}
+        ${caRow('🌆','Ca chiều', afternoon, hasAfternoon)}
+        ${caRow('🌙','Ca tối', evening, hasEvening)}
         <div style="font-size:0.8rem;margin-top:4px;display:grid;grid-template-columns:1fr 1fr;gap:4px">
           <div>✅ Checklist: ${clIcon} ${clLabel}</div>
           <div>📦 Kho: ${supIcon} ${sup?'Đã kiểm':'—'}</div>
