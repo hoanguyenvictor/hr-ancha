@@ -1189,13 +1189,25 @@ function saveSettings() {
   showToast('✅ Đã lưu cấu hình!', 'success');
 }
 
-function renderOfficeCoords() {
+async function renderOfficeCoords() {
+  // Luôn fetch từ server để đồng bộ mọi thiết bị
+  try {
+    const res = await apiCall('getOfficeLocation');
+    if (res.ok) {
+      localStorage.setItem('officeLat', res.lat);
+      localStorage.setItem('officeLng', res.lng);
+      DB_CONFIG.OFFICE_LAT = res.lat;
+      DB_CONFIG.OFFICE_LNG = res.lng;
+    }
+  } catch(e) {}
   const lat = localStorage.getItem('officeLat') || DB_CONFIG.OFFICE_LAT;
   const lng = localStorage.getItem('officeLng') || DB_CONFIG.OFFICE_LNG;
   const el = document.getElementById('currentOfficeCoords');
   if (el) el.innerHTML = `📍 Tọa độ hiện tại: <b>${lat}, ${lng}</b><br><span style="font-size:0.75rem">Nhân viên phải ở trong vòng ${DB_CONFIG.OFFICE_RADIUS_M}m tính từ điểm này</span>`;
-  document.getElementById('officeLat').value = lat;
-  document.getElementById('officeLng').value = lng;
+  const latEl = document.getElementById('officeLat');
+  const lngEl = document.getElementById('officeLng');
+  if (latEl) latEl.value = lat;
+  if (lngEl) lngEl.value = lng;
 }
 
 async function getMyLocationForOffice() {
