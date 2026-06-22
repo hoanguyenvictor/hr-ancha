@@ -622,6 +622,16 @@ async function init() {
   document.getElementById('loginModal').classList.add('hidden');
   state.user = user;
   setupHeader();
+  // Load tọa độ văn phòng mới nhất từ server ngay khi khởi động
+  try {
+    const locRes = await apiCall('getOfficeLocation');
+    if (locRes.ok) {
+      localStorage.setItem('officeLat', locRes.lat);
+      localStorage.setItem('officeLng', locRes.lng);
+      DB_CONFIG.OFFICE_LAT = locRes.lat;
+      DB_CONFIG.OFFICE_LNG = locRes.lng;
+    }
+  } catch(e) {}
   await loadTodayData();
   renderHome();
   renderChecklist();
