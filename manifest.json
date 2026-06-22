@@ -2,15 +2,15 @@
   "name": "Boss Ancha",
   "short_name": "Boss",
   "description": "Boss Dashboard — Quản lý nhân sự Ancha",
-  "start_url": "/hr-ancha/tools/hr-system/index.html",
-  "scope": "/hr-ancha/tools/hr-system/",
+  "start_url": "/hr-ancha/index.html",
+  "scope": "/hr-ancha/",
   "display": "standalone",
   "background_color": "#667eea",
   "theme_color": "#667eea",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "/hr-ancha/tools/hr-system/icon-boss.svg",
+      "src": "/hr-ancha/icon-boss.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
