@@ -1815,27 +1815,44 @@ async function loadEmpDiary() {
   const supplies    = resSupply.ok     ? (resSupply.data     || []) : [];
   const returns_    = resReturns.ok    ? (resReturns.data    || []) : [];
 
+  const shiftLabelVN = s => s === 'morning' ? '☀️ Ca sáng' : s === 'afternoon' ? '🌆 Ca chiều' : s === 'evening' ? '🌙 Ca tối' : '📋 Ca';
+
   const html = dates.map(date => {
-    const ci = checkins.filter(r => r.date === date);
-    const checkin  = ci.find(r => r.type === 'in' || r.shift);
-    const checkout = ci.find(r => r.type === 'out');
-    const sub   = submissions.find(r => r.date === date);
-    const sup   = supplies.find(r => r.date === date);
-    const rets  = returns_.filter(r => r.date === date);
+    const ci        = checkins.filter(r => r.date === date);
+    const morning   = ci.find(r => (r.shift || 'morning') === 'morning');
+    const afternoon = ci.find(r => r.shift === 'afternoon');
+    const evening   = ci.find(r => r.shift === 'evening');
+    const shifts    = [morning && {s:'morning',r:morning}, afternoon && {s:'afternoon',r:afternoon}, evening && {s:'evening',r:evening}].filter(Boolean);
+
+    const sub  = submissions.find(r => r.date === date);
+    const sup  = supplies.find(r => r.date === date);
+    const rets = returns_.filter(r => r.date === date);
 
     const isToday = date === today();
     const label = isToday ? `Hôm nay — ${date}` : date;
 
-    const row = (icon, title, value, color) =>
-      `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:0.83rem">${icon} ${title}</span>
-        <span style="font-size:0.82rem;font-weight:700;color:${color}">${value}</span>
+    const caRows = shifts.length ? shifts.map(({s, r}) => {
+      const late   = r.late === 'TRUE' || r.late === true || r.late === 1;
+      const lateMin = r.lateMin || r.late_min || 0;
+      const cin    = r.checkinTime  || r.checkIn  || '?';
+      const cout   = r.checkoutTime || r.checkOut || null;
+      const lateTag = late
+        ? `<span style="color:var(--warning);font-size:0.78rem"> ⚠️ Trễ ${lateMin}p</span>`
+        : `<span style="color:var(--success);font-size:0.78rem"> ✅</span>`;
+      const coTag = cout
+        ? `<span style="color:var(--success)"> → ${cout}</span>`
+        : `<span style="color:var(--warning)"> (chưa out)</span>`;
+      return `<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:0.82rem">
+        <b>${shiftLabelVN(s)}</b>${lateTag}<br>
+        <span style="color:var(--muted)">Vào:</span> ${cin}${coTag}
       </div>`;
+    }).join('')
+    : `<div style="padding:5px 0;border-bottom:1px solid var(--border);font-size:0.82rem;color:var(--danger)">❌ Không có ca nào</div>`;
 
-    const ciVal  = checkin  ? `✅ ${checkin.checkIn || checkin.time || ''}` : '❌ Chưa check-in';
-    const coVal  = checkout ? `✅ ${checkout.time || ''}` : (checkin ? '⏳ Chưa check-out' : '—');
-    const clVal  = sub ? (sub.status === 'approved' ? `✅ Đạt (${sub.doneTasks}/${sub.totalTasks})` : sub.status === 'rejected' ? `❌ Không đạt` : `⏳ Chờ Boss xác nhận (${sub.doneTasks}/${sub.totalTasks})`) : '— Chưa gửi';
-    const supVal = sup ? `✅ Đã kiểm kho` : '— Không có';
+    const clVal = sub
+      ? (sub.status === 'approved' ? `✅ Đạt (${sub.doneTasks}/${sub.totalTasks})` : sub.status === 'rejected' ? `❌ Không đạt` : `⏳ Chờ Boss (${sub.doneTasks}/${sub.totalTasks})`)
+      : '— Chưa gửi';
+    const supVal = sup ? '✅ Đã kiểm kho' : '— Không có';
     const retVal = rets.length ? rets.map(r => {
       const st = r.status === 'confirmed' ? '✅' : r.status === 'rejected' ? '❌' : '⏳';
       return `${st} ${r.type === 'customer' ? 'Khách trả' : 'VC'} ${r.orderId || r.count + ' đơn'}`;
@@ -1843,10 +1860,15 @@ async function loadEmpDiary() {
 
     return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px">
       <div style="font-weight:700;font-size:0.88rem;margin-bottom:8px;color:var(--primary)">${isToday ? '🟢 ' : '📅 '}${label}</div>
-      ${row('🕐','Check-in', ciVal, checkin ? 'var(--success)' : 'var(--danger)')}
-      ${row('🕔','Check-out', coVal, checkout ? 'var(--success)' : 'var(--muted)')}
-      ${row('✅','Checklist', clVal, sub?.status === 'approved' ? 'var(--success)' : sub?.status === 'rejected' ? 'var(--danger)' : 'var(--warning)')}
-      ${row('📦','Kiểm kho', supVal, sup ? 'var(--success)' : 'var(--muted)')}
+      ${caRows}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:0.83rem">✅ Checklist</span>
+        <span style="font-size:0.82rem;font-weight:700;color:${sub?.status==='approved'?'var(--success)':sub?.status==='rejected'?'var(--danger)':'var(--warning)'}">${clVal}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:0.83rem">📦 Kiểm kho</span>
+        <span style="font-size:0.82rem;font-weight:700;color:${sup?'var(--success)':'var(--muted)'}">${supVal}</span>
+      </div>
       <div style="padding:5px 0"><div style="font-size:0.83rem">🔄 Hoàn hàng:</div><div style="font-size:0.82rem;font-weight:700;margin-top:2px;line-height:1.6">${retVal}</div></div>
     </div>`;
   }).join('');
