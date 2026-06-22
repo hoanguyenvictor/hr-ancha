@@ -120,19 +120,19 @@ function checkDailyAttendance() {
     // Kiểm tra từng ca
     if (needMorning && !leaveMorning) {
       if (!morningRow) {
-        addAutoPenalty(emp.id, date, 'Không check-in ca sáng', 'Vắng mặt ca sáng');
+        addAutoPenalty(emp.id, date, 'Vắng mặt ca sáng', 'Không check-in ca sáng');
         violations.push(`❌ ${emp.name} — Không check-in ca sáng`);
       } else if (!morningRow.checkoutTime) {
-        addAutoPenalty(emp.id, date, 'Không check-out ca sáng', 'Thiếu check-out ca sáng');
+        addAutoPenalty(emp.id, date, 'Thiếu check-out ca sáng', 'Không check-out ca sáng');
         violations.push(`⚠️ ${emp.name} — Không check-out ca sáng`);
       }
     }
     if (needAfternoon && !leaveAfternoon) {
       if (!afternoonRow) {
-        addAutoPenalty(emp.id, date, 'Không check-in ca chiều', 'Vắng mặt ca chiều');
+        addAutoPenalty(emp.id, date, 'Vắng mặt ca chiều', 'Không check-in ca chiều');
         violations.push(`❌ ${emp.name} — Không check-in ca chiều`);
       } else if (!afternoonRow.checkoutTime) {
-        addAutoPenalty(emp.id, date, 'Không check-out ca chiều', 'Thiếu check-out ca chiều');
+        addAutoPenalty(emp.id, date, 'Thiếu check-out ca chiều', 'Không check-out ca chiều');
         violations.push(`⚠️ ${emp.name} — Không check-out ca chiều`);
       }
     }
@@ -458,7 +458,7 @@ function handleCheckin(data) {
   if (exists) return { ok: false, error: 'Đã check-in ca này rồi' };
   appendRow(SHEETS.CHECKIN, { empId, date, shift: shiftKey, checkinTime: time, late: late?'TRUE':'FALSE', lateMin: lateMin||0 });
   log('checkin', `${empId} - ${date} ${shiftKey} ${time}${late?' TRỄ '+lateMin+'p':''}`);
-  if (late) addAutoPenalty(empId, date, 'late_'+shiftKey, `Đi muộn ca ${shiftKey} ${lateMin} phút`);
+  if (late) addAutoPenalty(empId, date, `Đi muộn ca ${shiftKey === 'morning' ? 'sáng' : 'chiều'}`, `Đi muộn ${lateMin} phút`);
   return { ok: true };
 }
 
@@ -485,7 +485,7 @@ function handleCheckout(data) {
     }
   }
   log('checkout', `${empId} - ${date} ${shiftKey} ${time}${early?' VỀ SỚM '+earlyMin+'p':''}`);
-  if (early) addAutoPenalty(empId, date, 'early_'+shiftKey, `Về sớm ca ${shiftKey} ${earlyMin} phút`);
+  if (early) addAutoPenalty(empId, date, `Về sớm ca ${shiftKey === 'morning' ? 'sáng' : 'chiều'}`, `Về sớm ${earlyMin} phút`);
   return { ok: true };
 }
 
@@ -805,8 +805,15 @@ function handlePing(data, responded) {
 
 // ─── DEDUCTIONS ───────────────────────────────────────────────────
 function addDeduction(data) {
-  const { empId, month, date, reason, amount } = data;
-  appendRow(SHEETS.DEDUCTIONS, { empId, month, date, reason, amount });
+  const { empId, date, reason, amount } = data;
+  const month = (date || '').slice(0, 7) || data.month;
+  // Chống ghi trùng: cùng nhân viên, cùng ngày, cùng loại lý do (muộn ca sáng / muộn ca chiều)
+  const existing = sheetData(SHEETS.DEDUCTIONS).filter(r =>
+    String(r.empId) === String(empId) && String(r.date) === String(date) &&
+    String(r.reason).toLowerCase().includes(String(reason).toLowerCase().slice(0, 15))
+  );
+  if (existing.length > 0) return { ok: true, skipped: true };
+  appendRow(SHEETS.DEDUCTIONS, { empId, month, date, reason, amount: amount || 50000 });
   return { ok: true };
 }
 

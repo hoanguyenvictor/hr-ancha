@@ -368,13 +368,42 @@
       </div>
       <div class="form-group">
         <label>Bán kính check-in GPS (mét)</label>
-        <input type="number" id="settingRadius" value="100">
+        <input type="number" id="settingRadius" value="150">
       </div>
       <div class="form-group">
         <label>Lương tăng ca (đ/giờ)</label>
         <input type="number" id="settingOTRate" value="26000">
       </div>
       <button class="btn btn-primary" onclick="saveSettings()">💾 Lưu Cấu Hình</button>
+    </div>
+
+    <div class="card" style="border:2px solid #f59e0b">
+      <div class="card-title"><span class="icon">📍</span>Tọa Độ Văn Phòng</div>
+      <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px">
+        Nếu nhân viên check-in ở văn phòng nhưng bị báo "cách xa" — chị cần cập nhật lại tọa độ đúng của văn phòng.
+      </p>
+      <div id="currentOfficeCoords" style="font-size:0.82rem;background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px;color:var(--muted)">
+        Đang tải...
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <div style="flex:1">
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:4px">Latitude</label>
+          <input type="number" step="any" id="officeLat" placeholder="21.020672" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:0.82rem;box-sizing:border-box">
+        </div>
+        <div style="flex:1">
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:4px">Longitude</label>
+          <input type="number" step="any" id="officeLng" placeholder="105.8177024" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:0.82rem;box-sizing:border-box">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" style="flex:1;background:#f59e0b;color:white;font-weight:700" onclick="getMyLocationForOffice()">
+          📡 Lấy vị trí hiện tại của chị
+        </button>
+        <button class="btn btn-primary" style="flex:1" onclick="saveOfficeLocation()">
+          💾 Lưu tọa độ
+        </button>
+      </div>
+    </div>
     </div>
   </div>
 
@@ -1135,6 +1164,46 @@ function saveSettings() {
   showToast('✅ Đã lưu cấu hình!', 'success');
 }
 
+function renderOfficeCoords() {
+  const lat = localStorage.getItem('officeLat') || DB_CONFIG.OFFICE_LAT;
+  const lng = localStorage.getItem('officeLng') || DB_CONFIG.OFFICE_LNG;
+  const el = document.getElementById('currentOfficeCoords');
+  if (el) el.innerHTML = `📍 Tọa độ hiện tại: <b>${lat}, ${lng}</b><br><span style="font-size:0.75rem">Nhân viên phải ở trong vòng ${DB_CONFIG.OFFICE_RADIUS_M}m tính từ điểm này</span>`;
+  document.getElementById('officeLat').value = lat;
+  document.getElementById('officeLng').value = lng;
+}
+
+async function getMyLocationForOffice() {
+  const btn = event.target;
+  btn.textContent = '⏳ Đang lấy GPS...';
+  btn.disabled = true;
+  try {
+    const pos = await new Promise((resolve, reject) =>
+      navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
+    );
+    document.getElementById('officeLat').value = pos.coords.latitude.toFixed(7);
+    document.getElementById('officeLng').value = pos.coords.longitude.toFixed(7);
+    showToast(`✅ Lấy được vị trí! Accuracy: ±${Math.round(pos.coords.accuracy)}m — Nhấn Lưu tọa độ để xác nhận.`, 'success');
+  } catch(e) {
+    showToast('❌ Không lấy được GPS. Bật GPS và thử lại.', 'error');
+  }
+  btn.textContent = '📡 Lấy vị trí hiện tại của chị';
+  btn.disabled = false;
+}
+
+function saveOfficeLocation() {
+  const lat = parseFloat(document.getElementById('officeLat').value);
+  const lng = parseFloat(document.getElementById('officeLng').value);
+  if (!lat || !lng) { showToast('Nhập đủ tọa độ trước nhé chị!', 'error'); return; }
+  localStorage.setItem('officeLat', lat);
+  localStorage.setItem('officeLng', lng);
+  // Ghi vào DB_CONFIG để áp dụng ngay trong phiên này
+  DB_CONFIG.OFFICE_LAT = lat;
+  DB_CONFIG.OFFICE_LNG = lng;
+  renderOfficeCoords();
+  showToast(`✅ Đã lưu tọa độ văn phòng: ${lat}, ${lng}`, 'success');
+}
+
 function copyEmployeeLink() {
   const link = window.location.href.replace('index.html', 'employee.html');
   navigator.clipboard.writeText(link).then(()=>showToast('✅ Đã copy link nhân viên!','success'));
@@ -1339,7 +1408,7 @@ function switchPage(name, btn) {
   if (name === 'schedule') renderScheduleTab();
   if (name === 'notifications') { loadLeaveRequests(); loadNotifications(); loadAttendanceReports(); }
   if (name === 'diary') { window._bossDiaryFilter = window._bossDiaryFilter || 'day'; loadBossDiary(); }
-  if (name === 'settings') populateAssignEmpSel();
+  if (name === 'settings') { populateAssignEmpSel(); renderOfficeCoords(); }
 }
 
 function populateAssignEmpSel() {

@@ -7,7 +7,7 @@ const DB_CONFIG = {
   SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbz5yjTpDcbJvvKfrDrTnU_Xoloh7OzY0L-KkM3U8C3Whb5JSkc2hnv2y2W6lyq1E8nm7w/exec',
   OFFICE_LAT: 21.020672,
   OFFICE_LNG: 105.8177024,
-  OFFICE_RADIUS_M: 100,        // Bán kính cho phép check-in (mét)
+  OFFICE_RADIUS_M: 150,        // Bán kính cho phép check-in (mét)
   MORNING_START: '08:00',      // Ca sáng bắt đầu
   MORNING_END:   '12:00',      // Ca sáng kết thúc
   AFTERNOON_START: '13:00',    // Ca chiều bắt đầu
@@ -104,15 +104,15 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
 
 async function checkInOffice() {
   const pos = await getGPS();
-  // Yêu cầu GPS phải chính xác trong vòng 80m
-  if (pos.coords.accuracy > 80) {
-    return { ok: false, distance: 0, error: `GPS chưa ổn định (độ chính xác: ${Math.round(pos.coords.accuracy)}m). Vui lòng thử lại!` };
-  }
-  const dist = haversineDistance(
-    pos.coords.latitude, pos.coords.longitude,
-    DB_CONFIG.OFFICE_LAT, DB_CONFIG.OFFICE_LNG
-  );
-  return { ok: dist <= DB_CONFIG.OFFICE_RADIUS_M, distance: Math.round(dist), lat: pos.coords.latitude, lng: pos.coords.longitude };
+  // GPS trong nhà thường kém — chấp nhận accuracy tới 300m, nhưng dùng accuracy để điều chỉnh radius
+  const accuracy = Math.round(pos.coords.accuracy);
+  // Lấy tọa độ văn phòng từ localStorage nếu boss đã cập nhật
+  const savedLat = parseFloat(localStorage.getItem('officeLat')) || DB_CONFIG.OFFICE_LAT;
+  const savedLng = parseFloat(localStorage.getItem('officeLng')) || DB_CONFIG.OFFICE_LNG;
+  const dist = haversineDistance(pos.coords.latitude, pos.coords.longitude, savedLat, savedLng);
+  const effectiveRadius = Math.max(DB_CONFIG.OFFICE_RADIUS_M, accuracy * 0.8);
+  const ok = dist <= effectiveRadius;
+  return { ok, distance: Math.round(dist), accuracy, lat: pos.coords.latitude, lng: pos.coords.longitude };
 }
 
 // ── AUTH ───────────────────────────────────────────────

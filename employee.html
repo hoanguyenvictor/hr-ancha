@@ -877,12 +877,17 @@ async function doShiftAction(shift) {
       const late = diffMin > DB_CONFIG.LATE_GRACE_MINUTES;
       await apiCall('checkin', { empId: state.user.id, date: today(), time: timeStr, shift,
         lat: gps.lat, lng: gps.lng, late, lateMin: Math.max(0, diffMin), remote: isOnline });
+      // Ghi phạt ngay khi check-in muộn (không chờ 23:30)
+      if (late) {
+        const shiftNameVN = shift === 'morning' ? 'ca sáng' : 'ca chiều';
+        await apiCall('addDeduction', { empId: state.user.id, date: today(), reason: `Đi muộn ${shiftNameVN} ${diffMin} phút`, amount: 50000 });
+      }
       if (shift === 'morning') { d.morningCheckin = timeStr; d.morningLate = late; }
       else if (shift === 'afternoon') { d.afternoonCheckin = timeStr; d.afternoonLate = late; }
       else { d.eveningCheckin = timeStr; }
       const prefix = isOnline ? '🏠 Online · ' : '';
       const shiftLabel = shift === 'morning' ? 'sáng' : shift === 'afternoon' ? 'chiều' : 'tối';
-      showToast(late ? `⚠️ ${prefix}Check-in ${shiftLabel} lúc ${timeStr} — trễ ${diffMin} phút` : `✅ ${prefix}Check-in ${shiftLabel} ${timeStr} — Đúng giờ!`, late ? 'warning' : 'success');
+      showToast(late ? `⚠️ ${prefix}Check-in ${shiftLabel} lúc ${timeStr} — trễ ${diffMin} phút · Trừ 50.000đ thưởng` : `✅ ${prefix}Check-in ${shiftLabel} ${timeStr} — Đúng giờ!`, late ? 'warning' : 'success');
     } else {
       // Check-out
       const endStr = shift === 'morning' ? DB_CONFIG.MORNING_END : DB_CONFIG.AFTERNOON_END;
