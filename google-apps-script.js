@@ -330,7 +330,7 @@ function getSheet(name) {
 function initSheet(sheet, name) {
   const headers = {
     [SHEETS.EMPLOYEES]:  ['id','name','phone','salary','color','created','passHash'],
-    [SHEETS.CHECKIN]:    ['empId','date','checkinTime','checkoutTime','lat','lng','late','lateMin','approved'],
+    [SHEETS.CHECKIN]:    ['empId','date','shift','checkinTime','checkoutTime','lat','lng','late','lateMin','approved'],
     [SHEETS.CHECKLIST]:  ['empId','date','taskId','done','doneTime'],
     [SHEETS.SUPPLY]:     ['empId','date','time','carton_nap_gap_35x25x7','carton_nap_gap_20x15x6','carton_doi_khau_40x30x20','carton_doi_khau_35x25x15','carton_doi_khau_12x12x12','hop_dong_ho','hop_vong_tay','bang_dinh','xop_60cm','xop_40cm','giay_in_don','decan_noi','decan_vanh','decan_vua','giay_nen_vua','hasAlert','reportedBy','onBehalfOf'],
     [SHEETS.SCHEDULE]:   ['empId','weekStart','day','date','shift','eveningStart','eveningEnd','plannedHours','actualHours','status'],
@@ -562,10 +562,21 @@ function getTodayData(data) {
       checklist,
       supply: sup ? {
         data: {
-          carton_30x20x10: sup.carton_30x20x10,
-          carton_25x20x10: sup.carton_25x20x10,
-          carton_15x10x10: sup.carton_15x10x10,
-          tape: sup.tape, bubble_wrap: sup.bubble_wrap, print_paper: sup.print_paper
+          carton_nap_gap_35x25x7:  sup.carton_nap_gap_35x25x7,
+          carton_nap_gap_20x15x6:  sup.carton_nap_gap_20x15x6,
+          carton_doi_khau_40x30x20: sup.carton_doi_khau_40x30x20,
+          carton_doi_khau_35x25x15: sup.carton_doi_khau_35x25x15,
+          carton_doi_khau_12x12x12: sup.carton_doi_khau_12x12x12,
+          hop_dong_ho:    sup.hop_dong_ho,
+          hop_vong_tay:   sup.hop_vong_tay,
+          bang_dinh:      sup.bang_dinh,
+          xop_60cm:       sup.xop_60cm,
+          xop_40cm:       sup.xop_40cm,
+          giay_in_don:    sup.giay_in_don,
+          decan_noi:      sup.decan_noi,
+          decan_vanh:     sup.decan_vanh,
+          decan_vua:      sup.decan_vua,
+          giay_nen_vua:   sup.giay_nen_vua
         },
         hasAlert: sup.hasAlert === 'TRUE'
       } : null

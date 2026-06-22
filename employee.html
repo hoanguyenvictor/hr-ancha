@@ -1675,7 +1675,7 @@ async function renderSalary() {
       baseSalary      = res.data.baseSalary  || 0;
     }
   } catch(e) {}
-  const totalBonus = attendanceBonus + tasksBonus;
+  const totalBonus = attendanceBonus + tasksBonus + otPay + salesBonus;
   document.getElementById('totalBonusDisplay').textContent = formatVND(totalBonus);
   document.getElementById('bonusAttendance').textContent = formatVND(attendanceBonus);
   document.getElementById('bonusTasks').textContent = formatVND(tasksBonus);
