@@ -1458,7 +1458,43 @@ function cleanOldPhotos() {
   return { ok: true, deleted };
 }
 
-// Trigger tự động chạy hàng ngày — tạo 1 lần trong Apps Script
+// ─── SETUP TẤT CẢ TRIGGERS — chạy 1 lần duy nhất ────────────────
+// Chị vào Apps Script → chọn function setupAllTriggers → bấm Run
+function setupAllTriggers() {
+  const MANAGED = [
+    'notifyBossShiftSummary',
+    'checkDailyAttendance',
+    'remindScheduleRegistration',
+    'dailyCleanup',
+  ];
+  // Xóa tất cả trigger cũ của các function này để tránh trùng
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (MANAGED.includes(t.getHandlerFunction())) ScriptApp.deleteTrigger(t);
+  });
+
+  // 🌅 Ca sáng: 6h30–7h30 → atHour(6) = 6:00–7:00, nearestHour gần nhất là 7
+  ScriptApp.newTrigger('notifyBossShiftSummary').timeBased().everyDays(1).atHour(7).create();
+
+  // 🌆 Ca trưa: 12h–13h
+  ScriptApp.newTrigger('notifyBossShiftSummary').timeBased().everyDays(1).atHour(12).create();
+
+  // 🌙 Ca tối: 18h30–19h30 → atHour(19)
+  ScriptApp.newTrigger('notifyBossShiftSummary').timeBased().everyDays(1).atHour(19).create();
+
+  // ⏰ Chấm công tự động: 23h30
+  ScriptApp.newTrigger('checkDailyAttendance').timeBased().everyDays(1).atHour(23).create();
+
+  // 📅 Nhắc đăng ký lịch: Chủ Nhật 15h, 19h, 22h
+  ScriptApp.newTrigger('remindScheduleRegistration').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(15).create();
+  ScriptApp.newTrigger('remindScheduleRegistration').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(19).create();
+  ScriptApp.newTrigger('remindScheduleRegistration').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(22).create();
+
+  // 🧹 Dọn ảnh cũ: 2h sáng
+  ScriptApp.newTrigger('dailyCleanup').timeBased().everyDays(1).atHour(2).create();
+
+  Logger.log('✅ Đã tạo xong ' + ScriptApp.getProjectTriggers().length + ' triggers.');
+}
+
 function setupDailyCleanup() {
   ScriptApp.getProjectTriggers().forEach(t => {
     if (t.getHandlerFunction() === 'dailyCleanup') ScriptApp.deleteTrigger(t);
