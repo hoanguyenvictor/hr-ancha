@@ -70,7 +70,7 @@ function notifyBossShiftSummary() {
     shiftFilter = r => r.shift === 'afternoon' || r.shift === 'fullday' || r.shift === 'full';
     label = '🌆 Ca Chiều hôm nay';
   } else {
-    shiftFilter = r => String(r.hasOT) === 'true' || r.shift === 'evening';
+    shiftFilter = r => !!(r.eveningStart && String(r.eveningStart).trim() !== '') || r.shift === 'evening';
     label = '🌙 Tăng Ca Tối hôm nay';
   }
 
