@@ -408,6 +408,37 @@ function updateRow(name, matchField, matchVal, updates) {
 
 // ─── MIGRATION: thêm cột còn thiếu vào sheet CHECKIN ────
 // Chạy 1 lần trong Apps Script Editor: migrateCheckinSheet()
+// Chạy 1 lần: xóa toàn bộ dữ liệu ngày hôm nay khỏi Checkin, Checklist, Submissions
+function resetTodayData() {
+  var tz = Session.getScriptTimeZone();
+  var date = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var deleted = {};
+
+  ['Checkin','Checklist','Submissions'].forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) { deleted[name] = 'không tìm thấy sheet'; return; }
+    var vals = sheet.getDataRange().getValues();
+    var headers = vals[0];
+    var dateIdx = headers.indexOf('date');
+    if (dateIdx < 0) { deleted[name] = 'không có cột date'; return; }
+    // Xóa từ dưới lên để không lệch index
+    var count = 0;
+    for (var i = vals.length - 1; i >= 1; i--) {
+      var rowDate = vals[i][dateIdx];
+      if (rowDate instanceof Date) rowDate = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+      if (String(rowDate) === date) {
+        sheet.deleteRow(i + 1);
+        count++;
+      }
+    }
+    deleted[name] = 'đã xóa ' + count + ' dòng';
+  });
+
+  Logger.log('✅ Reset ngày ' + date + ':');
+  Object.keys(deleted).forEach(function(k) { Logger.log('  ' + k + ': ' + deleted[k]); });
+}
+
 function migrateCheckinSheet() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checkin');
   if (!sheet) { Logger.log('Không tìm thấy sheet Checkin'); return; }
