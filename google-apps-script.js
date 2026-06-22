@@ -93,6 +93,9 @@ function checkDailyAttendance() {
   const employees = sheetData(SHEETS.EMPLOYEES).filter(e => e.role !== 'boss' && e.id);
   const schedules = sheetData(SHEETS.SCHEDULE).filter(r => r.date === date);
   const checkins  = sheetData(SHEETS.CHECKIN).filter(r => r.date === date);
+  const approvedLeaves = sheetData(SHEETS.LEAVE_REQUESTS).filter(r =>
+    r.date === date && r.status === 'approved'
+  );
 
   const violations = [];
 
@@ -109,8 +112,13 @@ function checkDailyAttendance() {
     const morningRow   = checkins.find(r => String(r.empId) === String(emp.id) && (r.shift || 'morning') === 'morning');
     const afternoonRow = checkins.find(r => String(r.empId) === String(emp.id) && r.shift === 'afternoon');
 
+    // Leave request đã được chị duyệt → miễn trừ ca đó
+    const empLeaves = approvedLeaves.filter(r => String(r.empId) === String(emp.id));
+    const leaveMorning   = empLeaves.some(r => r.shift === 'morning'   || r.shift === 'fullday');
+    const leaveAfternoon = empLeaves.some(r => r.shift === 'afternoon' || r.shift === 'fullday');
+
     // Kiểm tra từng ca
-    if (needMorning) {
+    if (needMorning && !leaveMorning) {
       if (!morningRow) {
         addAutoPenalty(emp.id, date, 'Không check-in ca sáng', 'Vắng mặt ca sáng');
         violations.push(`❌ ${emp.name} — Không check-in ca sáng`);
@@ -119,7 +127,7 @@ function checkDailyAttendance() {
         violations.push(`⚠️ ${emp.name} — Không check-out ca sáng`);
       }
     }
-    if (needAfternoon) {
+    if (needAfternoon && !leaveAfternoon) {
       if (!afternoonRow) {
         addAutoPenalty(emp.id, date, 'Không check-in ca chiều', 'Vắng mặt ca chiều');
         violations.push(`❌ ${emp.name} — Không check-in ca chiều`);
@@ -205,6 +213,7 @@ const SHEETS = {
   SUBMISSIONS:       'Submissions',
   RETURN_SUBS:       'ReturnSubmissions',
   ASSIGNED_TASKS:    'AssignedTasks',
+  LEAVE_REQUESTS:    'LeaveRequests',
 };
 
 // ─── ENTRY POINT (GET — tránh CORS) ──────────────────────────────
@@ -284,6 +293,10 @@ function doGet(e) {
       case 'getPendingReturns':     result = getPendingReturns(data); break;
       case 'confirmReturn':         result = confirmReturn(data); break;
       case 'getMyReturns':          result = getMyReturns(data); break;
+      case 'submitLeaveRequest':    result = submitLeaveRequest(data); break;
+      case 'getLeaveRequests':      result = getLeaveRequests(data); break;
+      case 'reviewLeaveRequest':    result = reviewLeaveRequest(data); break;
+      case 'getMyLeaveRequests':    result = getMyLeaveRequests(data); break;
       default: result = { ok: false, error: 'Unknown action: ' + action };
     }
 
@@ -331,6 +344,7 @@ function initSheet(sheet, name) {
     [SHEETS.SUBMISSIONS]:  ['id','empId','date','time','totalTasks','doneTasks','status','reviewedAt'],
     [SHEETS.RETURN_SUBS]: ['id','empId','date','time','type','orderId','amount','bankInfo','condition','photoShipper','photoActual','photoQR','count','orderIds','photoOrders','photoPancake','status','proofUrl','confirmedAt'],
     [SHEETS.ASSIGNED_TASKS]: ['id','empId','bossDate','desc','status','doneTime','doneNote'],
+    [SHEETS.LEAVE_REQUESTS]: ['id','empId','date','shift','reason','photoUrl','status','approvedAt','approvedBy'],
   };
   if (headers[name]) sheet.getRange(1, 1, 1, headers[name].length).setValues([headers[name]]);
 }
@@ -1014,6 +1028,78 @@ function approveDay(data) {
   updateRow(SHEETS.CHECKIN, 'empId', empId, { approved: 'TRUE' });
   log('APPROVE_DAY', `Boss xác nhận ngày làm ${empId} - ${date}`);
   return { ok: true };
+}
+
+// ─── LEAVE REQUESTS ───────────────────────────────────────────────
+function submitLeaveRequest(data) {
+  const { empId, date, shift, reason, photoUrl } = data;
+  if (!empId || !date || !shift || !reason) return { ok: false, error: 'Thiếu thông tin' };
+  const tz = Session.getScriptTimeZone();
+  const id = 'LR-' + Utilities.formatDate(new Date(), tz, 'yyyyMMddHHmmss') + '-' + String(empId);
+  appendRow(SHEETS.LEAVE_REQUESTS, { id, empId, date, shift, reason, photoUrl: photoUrl || '', status: 'pending', approvedAt: '', approvedBy: '' });
+
+  // Thông báo cho boss
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let nSheet = ss.getSheetByName('BossNotifications');
+  if (!nSheet) { nSheet = ss.insertSheet('BossNotifications'); nSheet.appendRow(['date','type','message','read']); }
+  const emp = sheetData(SHEETS.EMPLOYEES).find(e => String(e.id) === String(empId));
+  const shiftLabel = shift === 'morning' ? 'ca sáng' : shift === 'afternoon' ? 'ca chiều' : 'cả ngày';
+  nSheet.appendRow([date, 'leave_request', `🏥 ${emp?.name || empId} xin nghỉ ${shiftLabel} ngày ${date}. Lý do: ${reason}. ID: ${id}`, 'false']);
+
+  log('LEAVE_REQUEST', `${empId} xin nghỉ ${shift} ${date}: ${reason}`);
+  return { ok: true, id };
+}
+
+function getLeaveRequests(data) {
+  const { month } = data;
+  const rows = sheetData(SHEETS.LEAVE_REQUESTS).filter(r =>
+    !month || (r.date && r.date.startsWith(month))
+  );
+  const employees = sheetData(SHEETS.EMPLOYEES);
+  const enriched = rows.map(r => {
+    const emp = employees.find(e => String(e.id) === String(r.empId));
+    return { ...r, empName: emp?.name || r.empId };
+  });
+  return { ok: true, data: enriched };
+}
+
+function reviewLeaveRequest(data) {
+  const { id, status } = data; // status: 'approved' | 'rejected'
+  if (!id || !['approved','rejected'].includes(status)) return { ok: false, error: 'Dữ liệu không hợp lệ' };
+  const tz = Session.getScriptTimeZone();
+  const approvedAt = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd HH:mm');
+  const sheet = getSheet(SHEETS.LEAVE_REQUESTS);
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const rows = sheet.getDataRange().getValues();
+  const idIdx = headers.indexOf('id');
+  const statusIdx = headers.indexOf('status');
+  const approvedAtIdx = headers.indexOf('approvedAt');
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][idIdx]) === String(id)) {
+      sheet.getRange(i+1, statusIdx+1).setValue(status);
+      sheet.getRange(i+1, approvedAtIdx+1).setValue(approvedAt);
+      // Thông báo lại cho nhân viên
+      const empId = rows[i][headers.indexOf('empId')];
+      const date  = rows[i][headers.indexOf('date')];
+      const shift = rows[i][headers.indexOf('shift')];
+      const shiftLabel = shift === 'morning' ? 'ca sáng' : shift === 'afternoon' ? 'ca chiều' : 'cả ngày';
+      const msg = status === 'approved'
+        ? `✅ Nghỉ phép ${shiftLabel} ngày ${date} đã được chị DUYỆT — bạn sẽ không bị trừ thưởng chuyên cần.`
+        : `❌ Nghỉ phép ${shiftLabel} ngày ${date} đã bị TỪ CHỐI. Liên hệ chị để biết thêm.`;
+      pushEmpNotification(empId, date, 'leave_result', msg);
+      log('LEAVE_REVIEW', `${id} → ${status}`);
+      return { ok: true };
+    }
+  }
+  return { ok: false, error: 'Không tìm thấy đơn xin nghỉ' };
+}
+
+function getMyLeaveRequests(data) {
+  const { empId } = data;
+  const rows = sheetData(SHEETS.LEAVE_REQUESTS)
+    .filter(r => String(r.empId) === String(empId))
+    .sort((a, b) => b.date > a.date ? 1 : -1);
+  return { ok: true, data: rows };
 }
 
 // ─── SCHEDULE ─────────────────────────────────────────────────────

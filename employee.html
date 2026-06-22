@@ -242,6 +242,57 @@
 
 </div><!-- end page-checklist -->
 
+<!-- ── XIN NGHỈ PHÉP ──────────────────────────────── -->
+<div class="page" id="page-leave">
+  <div class="card" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:white">
+    <div style="font-size:0.85rem;opacity:0.9;margin-bottom:4px">Xin nghỉ đột xuất</div>
+    <div style="font-size:1.3rem;font-weight:800">🏥 Ốm / Việc gia đình</div>
+    <div style="font-size:0.78rem;opacity:0.8;margin-top:4px">Gửi trước, chờ chị duyệt — không bị trừ thưởng</div>
+  </div>
+
+  <!-- Form xin nghỉ -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📝</span>Gửi Đơn Xin Nghỉ</div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:6px">Ngày xin nghỉ</label>
+      <input type="date" id="leaveDate" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:0.88rem;box-sizing:border-box">
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:6px">Ca nghỉ</label>
+      <div style="display:flex;gap:8px">
+        <button id="lshift-morning" onclick="selectLeaveShift('morning')" style="flex:1;padding:10px 4px;border:2px solid var(--border);border-radius:10px;background:white;font-size:0.82rem;font-weight:600;cursor:pointer">☀️ Ca sáng</button>
+        <button id="lshift-afternoon" onclick="selectLeaveShift('afternoon')" style="flex:1;padding:10px 4px;border:2px solid var(--border);border-radius:10px;background:white;font-size:0.82rem;font-weight:600;cursor:pointer">🌤 Ca chiều</button>
+        <button id="lshift-fullday" onclick="selectLeaveShift('fullday')" style="flex:1;padding:10px 4px;border:2px solid var(--border);border-radius:10px;background:white;font-size:0.82rem;font-weight:600;cursor:pointer">🌅 Cả ngày</button>
+      </div>
+    </div>
+    <div style="margin-bottom:10px">
+      <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:6px">Lý do <span style="color:var(--danger)">*</span></label>
+      <textarea id="leaveReason" placeholder="VD: Em bị sốt 38.5°C, đang điều trị tại nhà..." rows="3"
+        style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:0.85rem;resize:none;box-sizing:border-box"></textarea>
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:6px">Ảnh đính kèm (tùy chọn)</label>
+      <div id="leavePhotoPreview" style="display:none;margin-bottom:8px">
+        <img id="leavePhotoImg" style="width:100%;border-radius:10px;max-height:200px;object-fit:cover">
+        <button onclick="clearLeavePhoto()" style="margin-top:6px;font-size:0.78rem;color:var(--danger);background:none;border:none;cursor:pointer">✕ Xóa ảnh</button>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;padding:10px;border:2px dashed var(--border);border-radius:10px;cursor:pointer;font-size:0.82rem;color:var(--muted)">
+        <span style="font-size:1.2rem">📷</span> Chụp ảnh hoặc chọn từ thư viện
+        <input type="file" id="leavePhoto" accept="image/*" capture="environment" style="display:none" onchange="previewLeavePhoto(this)">
+      </label>
+    </div>
+    <button class="btn btn-primary" onclick="submitLeaveRequest()" style="width:100%;background:linear-gradient(135deg,#f59e0b,#ef4444)">
+      📤 Gửi Đơn Xin Nghỉ
+    </button>
+  </div>
+
+  <!-- Lịch sử đơn -->
+  <div class="card">
+    <div class="card-title"><span class="icon">📋</span>Lịch Sử Đơn Nghỉ</div>
+    <div id="leaveHistory"><p style="color:var(--muted);font-size:0.85rem">Đang tải...</p></div>
+  </div>
+</div>
+
 <!-- ── KHO (placeholder để không lỗi switchPage cũ) ── -->
 <div id="page-inventory" style="display:none"></div>
 
@@ -468,8 +519,8 @@
   <button class="nav-item" onclick="switchPage('overtime',this)">
     <span class="icon">📅</span><span>Lịch</span>
   </button>
-  <button class="nav-item" onclick="switchPage('diary',this)">
-    <span class="icon">📒</span><span>Nhật Ký</span>
+  <button class="nav-item" onclick="switchPage('leave',this)">
+    <span class="icon">🏥</span><span>Xin Nghỉ</span>
   </button>
   <button class="nav-item" onclick="switchPage('salary',this)">
     <span class="icon">💰</span><span>Lương</span>
@@ -1661,7 +1712,7 @@ function switchPage(name, btn) {
   document.getElementById(`page-${name}`).classList.add('active');
   if (btn) btn.classList.add('active');
   else {
-    const navBtns = { home: 0, checklist: 1, inventory: 2, overtime: 3, diary: 4, salary: 5, settings: 6 };
+    const navBtns = { home: 0, checklist: 1, overtime: 2, leave: 3, salary: 4, settings: 5 };
     document.querySelectorAll('.nav-item')[navBtns[name] ?? 0].classList.add('active');
   }
   if (name === 'overtime') renderSchedule();
@@ -1669,6 +1720,7 @@ function switchPage(name, btn) {
   if (name === 'settings') renderSettingsPage();
   if (name === 'emp-notifications') loadEmpNotifications();
   if (name === 'diary') { window._diaryFilter = window._diaryFilter || 'day'; loadEmpDiary(); }
+  if (name === 'leave') initLeavePage();
 }
 
 // ─── NHẬT KÝ NHÂN VIÊN ────────────────────────────────────
@@ -2019,6 +2071,114 @@ if ('serviceWorker' in navigator) {
 }
 
 init();
+
+// ─── XIN NGHỈ PHÉP ────────────────────────────────────────────────
+let _leaveShift = '';
+
+function initLeavePage() {
+  // Điền ngày mặc định = hôm nay
+  const d = document.getElementById('leaveDate');
+  if (d && !d.value) d.value = today();
+  _leaveShift = '';
+  ['morning','afternoon','fullday'].forEach(s => {
+    const btn = document.getElementById(`lshift-${s}`);
+    if (btn) { btn.style.background = 'white'; btn.style.color = 'var(--text)'; btn.style.borderColor = 'var(--border)'; }
+  });
+  loadLeaveHistory();
+}
+
+function selectLeaveShift(shift) {
+  _leaveShift = shift;
+  ['morning','afternoon','fullday'].forEach(s => {
+    const btn = document.getElementById(`lshift-${s}`);
+    if (!btn) return;
+    if (s === shift) {
+      btn.style.background = '#f59e0b'; btn.style.color = 'white'; btn.style.borderColor = '#f59e0b';
+    } else {
+      btn.style.background = 'white'; btn.style.color = 'var(--text)'; btn.style.borderColor = 'var(--border)';
+    }
+  });
+}
+
+function previewLeavePhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('leavePhotoImg').src = e.target.result;
+    document.getElementById('leavePhotoPreview').style.display = 'block';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function clearLeavePhoto() {
+  document.getElementById('leavePhoto').value = '';
+  document.getElementById('leavePhotoPreview').style.display = 'none';
+  document.getElementById('leavePhotoImg').src = '';
+}
+
+async function submitLeaveRequest() {
+  if (!state.user) return;
+  const date   = document.getElementById('leaveDate').value;
+  const reason = document.getElementById('leaveReason').value.trim();
+  if (!date)    { showToast('Vui lòng chọn ngày xin nghỉ', 'error'); return; }
+  if (!_leaveShift) { showToast('Vui lòng chọn ca nghỉ', 'error'); return; }
+  if (!reason)  { showToast('Vui lòng ghi rõ lý do', 'error'); return; }
+
+  // Upload ảnh nếu có (dùng base64 gửi kèm, lưu vào photoUrl)
+  let photoUrl = '';
+  const photoInput = document.getElementById('leavePhoto');
+  if (photoInput.files && photoInput.files[0]) {
+    photoUrl = document.getElementById('leavePhotoImg').src; // base64 preview
+  }
+
+  const btn = document.querySelector('#page-leave .btn-primary');
+  btn.disabled = true; btn.textContent = '⏳ Đang gửi...';
+
+  const res = await apiCall('submitLeaveRequest', {
+    empId: state.user.id, date, shift: _leaveShift, reason, photoUrl
+  });
+
+  btn.disabled = false; btn.innerHTML = '📤 Gửi Đơn Xin Nghỉ';
+
+  if (res.ok) {
+    showToast('✅ Đã gửi đơn! Chờ chị duyệt.', 'success');
+    document.getElementById('leaveReason').value = '';
+    clearLeavePhoto();
+    _leaveShift = '';
+    ['morning','afternoon','fullday'].forEach(s => {
+      const b = document.getElementById(`lshift-${s}`);
+      if (b) { b.style.background='white'; b.style.color='var(--text)'; b.style.borderColor='var(--border)'; }
+    });
+    loadLeaveHistory();
+  } else {
+    showToast('Gửi thất bại, thử lại nhé', 'error');
+  }
+}
+
+async function loadLeaveHistory() {
+  if (!state.user) return;
+  const res = await apiCall('getMyLeaveRequests', { empId: state.user.id });
+  const el = document.getElementById('leaveHistory');
+  if (!res.ok || !res.data || !res.data.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:0.85rem">Chưa có đơn nào</p>';
+    return;
+  }
+  const shiftLabel = s => s === 'morning' ? 'Ca sáng' : s === 'afternoon' ? 'Ca chiều' : 'Cả ngày';
+  const statusBadge = s => {
+    if (s === 'approved') return '<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:20px;font-size:0.75rem;font-weight:700">✅ Đã duyệt</span>';
+    if (s === 'rejected') return '<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:20px;font-size:0.75rem;font-weight:700">❌ Từ chối</span>';
+    return '<span style="background:#fef9c3;color:#b45309;padding:2px 8px;border-radius:20px;font-size:0.75rem;font-weight:700">⏳ Chờ duyệt</span>';
+  };
+  el.innerHTML = res.data.slice(0,10).map(r => `
+    <div style="border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div style="font-weight:700;font-size:0.88rem">${r.date} — ${shiftLabel(r.shift)}</div>
+        ${statusBadge(r.status)}
+      </div>
+      <div style="font-size:0.82rem;color:var(--muted)">${r.reason}</div>
+      ${r.photoUrl ? `<img src="${r.photoUrl}" style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:6px">` : ''}
+    </div>`).join('');
+}
 </script>
 </body>
 </html>

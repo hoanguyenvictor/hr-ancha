@@ -328,8 +328,13 @@
 
 <!-- ── CÀI ĐẶT ────────────────────────────────────── -->
 <div class="page" id="page-notifications">
-  <div class="card">
-    <div class="card-title"><span class="icon">🔔</span>Thông Báo Chờ Xác Nhận</div>
+  <!-- Đơn xin nghỉ chờ duyệt -->
+  <div class="card" style="border:2px solid #f59e0b">
+    <div class="card-title"><span class="icon">🏥</span>Đơn Xin Nghỉ Chờ Duyệt <span id="leavePendingBadge" style="background:#ef4444;color:white;border-radius:20px;padding:1px 7px;font-size:0.72rem;margin-left:4px;display:none">0</span></div>
+    <div id="leaveRequestList"><p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p></div>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <div class="card-title"><span class="icon">🔔</span>Thông Báo Hệ Thống</div>
     <div id="notifList"><p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p></div>
   </div>
   <div class="card" style="margin-top:12px">
@@ -1332,7 +1337,7 @@ function switchPage(name, btn) {
   }
   if (name === 'staff') { loadEmployees(); loadOvertimeList(); }
   if (name === 'schedule') renderScheduleTab();
-  if (name === 'notifications') { loadNotifications(); loadAttendanceReports(); }
+  if (name === 'notifications') { loadLeaveRequests(); loadNotifications(); loadAttendanceReports(); }
   if (name === 'diary') { window._bossDiaryFilter = window._bossDiaryFilter || 'day'; loadBossDiary(); }
   if (name === 'settings') populateAssignEmpSel();
 }
@@ -1739,6 +1744,70 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(r => r.unregister()));
 }
 init();
+
+// ─── DUYỆT ĐƠN XIN NGHỈ ──────────────────────────────────────────
+async function loadLeaveRequests() {
+  const res = await apiCall('getLeaveRequests', { month: monthKey() });
+  const el = document.getElementById('leaveRequestList');
+  const badge = document.getElementById('leavePendingBadge');
+  if (!res.ok || !res.data || !res.data.length) {
+    el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Không có đơn nào tháng này</p>';
+    badge.style.display = 'none';
+    return;
+  }
+  const pending = res.data.filter(r => r.status === 'pending');
+  if (pending.length > 0) {
+    badge.style.display = 'inline';
+    badge.textContent = pending.length;
+  } else {
+    badge.style.display = 'none';
+  }
+  const shiftLabel = s => s === 'morning' ? 'Ca sáng ☀️' : s === 'afternoon' ? 'Ca chiều 🌤' : 'Cả ngày 🌅';
+  const statusBadge = s => {
+    if (s === 'approved') return '<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:20px;font-size:0.75rem;font-weight:700">✅ Đã duyệt</span>';
+    if (s === 'rejected') return '<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:20px;font-size:0.75rem;font-weight:700">❌ Từ chối</span>';
+    return '<span style="background:#fef9c3;color:#b45309;padding:2px 8px;border-radius:20px;font-size:0.75rem;font-weight:700">⏳ Chờ duyệt</span>';
+  };
+  // Pending lên đầu
+  const sorted = [...res.data].sort((a,b) => {
+    if (a.status === 'pending' && b.status !== 'pending') return -1;
+    if (a.status !== 'pending' && b.status === 'pending') return 1;
+    return b.date > a.date ? 1 : -1;
+  });
+  el.innerHTML = sorted.map(r => `
+    <div style="border:1.5px solid ${r.status==='pending'?'#f59e0b':'var(--border)'};border-radius:12px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-weight:800;font-size:0.9rem">${r.empName}</div>
+        ${statusBadge(r.status)}
+      </div>
+      <div style="font-size:0.82rem;color:var(--muted);margin-bottom:4px">📅 ${r.date} &nbsp;|&nbsp; ${shiftLabel(r.shift)}</div>
+      <div style="font-size:0.85rem;margin-bottom:8px">${r.reason}</div>
+      ${r.photoUrl ? `<img src="${r.photoUrl}" style="width:100%;max-height:150px;object-fit:cover;border-radius:8px;margin-bottom:8px" onclick="this.style.maxHeight=this.style.maxHeight==='none'?'150px':'none'">` : ''}
+      ${r.status === 'pending' ? `
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button onclick="reviewLeaveRequest('${r.id}','approved')"
+          style="flex:1;padding:9px;background:var(--success);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.85rem">
+          ✅ Duyệt — Không trừ thưởng
+        </button>
+        <button onclick="reviewLeaveRequest('${r.id}','rejected')"
+          style="flex:1;padding:9px;background:var(--danger);color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:0.85rem">
+          ❌ Từ chối
+        </button>
+      </div>` : ''}
+    </div>`).join('');
+}
+
+async function reviewLeaveRequest(id, status) {
+  const label = status === 'approved' ? 'DUYỆT đơn nghỉ' : 'TỪ CHỐI đơn nghỉ';
+  if (!confirm(`Xác nhận ${label}?\n${status === 'approved' ? 'Nhân viên sẽ không bị trừ thưởng chuyên cần ngày đó.' : 'Nhân viên sẽ bị trừ thưởng nếu không check-in.'}`)) return;
+  const res = await apiCall('reviewLeaveRequest', { id, status });
+  if (res.ok) {
+    showToast(status === 'approved' ? '✅ Đã duyệt! Nhân viên đã được thông báo.' : '❌ Đã từ chối.', status === 'approved' ? 'success' : 'warning');
+    loadLeaveRequests();
+  } else {
+    showToast('Lỗi xử lý, thử lại!', 'error');
+  }
+}
 </script>
 </body>
 </html>
