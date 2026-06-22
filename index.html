@@ -1226,7 +1226,8 @@ function saveSettings() {
   DB_CONFIG.OFFICE_RADIUS_M = s.radius;
   DB_CONFIG.OVERTIME_RATE = s.otRate;
   localStorage.setItem('hrSettings', JSON.stringify(s));
-  showToast('✅ Đã lưu cấu hình!', 'success');
+  showToast('✅ Đã lưu — đang tải lại dữ liệu...', 'success');
+  refreshAll();
 }
 
 async function renderOfficeCoords() {
