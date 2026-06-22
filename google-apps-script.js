@@ -55,7 +55,11 @@ function notifyBossShiftSummary() {
   const now = new Date();
   const date = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
   const hour = now.getHours();
-  const schedules = sheetData(SHEETS.SCHEDULE).filter(r => r.date === date && r.shift !== 'off');
+  // Dedup: mỗi nhân viên chỉ lấy lần đăng ký cuối cùng trong ngày
+  const allSched = sheetData(SHEETS.SCHEDULE).filter(r => r.date === date);
+  const latestMap = {};
+  allSched.forEach(r => { latestMap[String(r.empId)] = r; }); // ghi đè → giữ dòng cuối
+  const schedules = Object.values(latestMap).filter(r => r.shift !== 'off');
   const employees = sheetData(SHEETS.EMPLOYEES).filter(e => e.role !== 'boss');
 
   let shiftFilter, label;
@@ -91,7 +95,11 @@ function checkDailyAttendance() {
   const month = date.slice(0, 7);
 
   const employees = sheetData(SHEETS.EMPLOYEES).filter(e => e.role !== 'boss' && e.id);
-  const schedules = sheetData(SHEETS.SCHEDULE).filter(r => r.date === date);
+  // Dedup lịch: mỗi nhân viên chỉ lấy lần đăng ký cuối cùng
+  const _schedAll = sheetData(SHEETS.SCHEDULE).filter(r => r.date === date);
+  const _schedMap = {};
+  _schedAll.forEach(function(r) { _schedMap[String(r.empId)] = r; });
+  const schedules = Object.values(_schedMap);
   const checkins  = sheetData(SHEETS.CHECKIN).filter(r => r.date === date);
   const approvedLeaves = sheetData(SHEETS.LEAVE_REQUESTS).filter(r =>
     r.date === date && r.status === 'approved'
@@ -561,7 +569,9 @@ function getTodayData(data) {
   const supplies = sheetData(SHEETS.SUPPLY).filter(r => String(r.empId)===String(empId) && String(r.date)===String(date));
 
   // Lịch đã đăng ký hôm nay
-  const todaySchedule = sheetData(SHEETS.SCHEDULE).find(r => String(r.empId)===String(empId) && String(r.date)===String(date));
+  // Lấy lần đăng ký cuối cùng của nhân viên trong ngày
+  const _allSched = sheetData(SHEETS.SCHEDULE).filter(r => String(r.empId)===String(empId) && String(r.date)===String(date));
+  const todaySchedule = _allSched.length ? _allSched[_allSched.length - 1] : null;
   const scheduledShift = todaySchedule ? (todaySchedule.shift || 'fullday') : 'fullday';
   const eveningStart = todaySchedule ? fmtTime(todaySchedule.eveningStart) : '';
   const eveningEnd   = todaySchedule ? fmtTime(todaySchedule.eveningEnd)   : '';
