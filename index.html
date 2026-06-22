@@ -1986,9 +1986,15 @@ async function loadLeaveRequests() {
   const res = await apiCall('getLeaveRequests', { month: monthKey() });
   const el = document.getElementById('leaveRequestList');
   const badge = document.getElementById('leavePendingBadge');
-  if (!res.ok || !res.data || !res.data.length) {
+  if (!el) return;
+  if (!res.ok) {
+    el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Không thể tải — kiểm tra kết nối</p>';
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+  if (!res.data || !res.data.length) {
     el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Không có đơn nào tháng này</p>';
-    badge.style.display = 'none';
+    if (badge) badge.style.display = 'none';
     return;
   }
   const pending = res.data.filter(r => r.status === 'pending');
