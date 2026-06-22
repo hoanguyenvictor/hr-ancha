@@ -462,6 +462,12 @@ function handleCheckin(data) {
   appendRow(SHEETS.CHECKIN, { empId, date, shift: shiftKey, checkinTime: time, late: late?'TRUE':'FALSE', lateMin: lateMin||0 });
   log('checkin', `${empId} - ${date} ${shiftKey} ${time}${late?' TRỄ '+lateMin+'p':''}`);
   if (late) addAutoPenalty(empId, date, `Đi muộn ca ${shiftKey === 'morning' ? 'sáng' : 'chiều'}`, `Đi muộn ${lateMin} phút`);
+  // Thông báo Telegram cho boss
+  const emp = sheetData(SHEETS.EMPLOYEES).find(e => String(e.id) === String(empId));
+  const empName = emp ? emp.name : empId;
+  const shiftLabel = shiftKey === 'morning' ? '☀️ Ca sáng' : shiftKey === 'afternoon' ? '🌆 Ca chiều' : '🌙 Tăng ca';
+  const lateNote = late ? ` ⚠️ Trễ ${lateMin} phút` : ' ✅';
+  sendTelegram(`📍 <b>Check-in</b>\n👤 ${empName}\n${shiftLabel} · ${time}${lateNote}\n📅 ${date}`);
   return { ok: true };
 }
 

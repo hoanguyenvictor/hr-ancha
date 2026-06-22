@@ -231,10 +231,11 @@
 <div class="page" id="page-schedule">
   <!-- Tab bar -->
   <div style="display:flex;gap:6px;margin-bottom:14px;background:var(--card);border-radius:12px;padding:4px">
-    <button id="schtab-view"    onclick="switchSchedTab('view')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.72rem;font-weight:700;cursor:pointer;background:var(--primary);color:white">📅 Lịch Tuần</button>
-    <button id="schtab-edit"    onclick="switchSchedTab('edit')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.72rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">✏️ Sửa Lịch</button>
-    <button id="schtab-penalty" onclick="switchSchedTab('penalty')" style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.72rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">⚠️ Vi Phạm</button>
-    <button id="schtab-assign"  onclick="switchSchedTab('assign')"  style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.72rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">📌 Giao Việc</button>
+    <button id="schtab-view"    onclick="switchSchedTab('view')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.68rem;font-weight:700;cursor:pointer;background:var(--primary);color:white">📅 Lịch Tuần</button>
+    <button id="schtab-leave"   onclick="switchSchedTab('leave')"   style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.68rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">🏥 Xin Nghỉ</button>
+    <button id="schtab-edit"    onclick="switchSchedTab('edit')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.68rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">✏️ Sửa Lịch</button>
+    <button id="schtab-penalty" onclick="switchSchedTab('penalty')" style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.68rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">⚠️ Vi Phạm</button>
+    <button id="schtab-assign"  onclick="switchSchedTab('assign')"  style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.68rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted)">📌 Giao Việc</button>
   </div>
 
   <!-- Tab: Lịch Tuần -->
@@ -247,6 +248,14 @@
         <button class="btn btn-sm" onclick="shiftWeek(1)" style="padding:6px 12px">Tuần sau ▶</button>
       </div>
       <div id="schedTable" style="overflow-x:auto"></div>
+    </div>
+  </div>
+
+  <!-- Tab: Xin Nghỉ -->
+  <div id="schedTab-leave" style="display:none">
+    <div class="card">
+      <div class="card-title"><span class="icon">🏥</span>Đơn Xin Nghỉ Phép</div>
+      <div id="leaveRequestList"><p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p></div>
     </div>
   </div>
 
@@ -1526,7 +1535,7 @@ function switchSettingsTab(tab) {
 }
 
 function switchSchedTab(tab) {
-  ['view','edit','penalty','assign'].forEach(t => {
+  ['view','leave','edit','penalty','assign'].forEach(t => {
     const el = document.getElementById(`schedTab-${t}`);
     const btn = document.getElementById(`schtab-${t}`);
     if (!el || !btn) return;
@@ -1536,6 +1545,51 @@ function switchSchedTab(tab) {
     btn.style.color = active ? 'white' : 'var(--muted)';
   });
   if (tab === 'assign') populateAssignEmpSel();
+  if (tab === 'leave') loadLeaveRequestsTab();
+}
+
+async function loadLeaveRequestsTab() {
+  const el = document.getElementById('leaveRequestList');
+  el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Đang tải...</p>';
+  const res = await apiCall('getLeaveRequests');
+  if (!res.ok || !res.data?.length) {
+    el.innerHTML = '<p style="font-size:0.85rem;color:var(--muted)">Chưa có đơn xin nghỉ nào.</p>';
+    return;
+  }
+  const employees = state.employees || [];
+  const rows = [...res.data].sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  el.innerHTML = rows.map(r => {
+    const emp = employees.find(e => String(e.id) === String(r.empId));
+    const name = emp ? emp.name : r.empId;
+    const shiftLabel = r.shift === 'morning' ? '☀️ Ca sáng' : r.shift === 'afternoon' ? '🌆 Ca chiều' : '🌴 Cả ngày';
+    const statusBadge = r.status === 'approved'
+      ? '<span style="color:var(--success);font-weight:700">✅ Đã duyệt</span>'
+      : r.status === 'rejected'
+      ? '<span style="color:var(--danger);font-weight:700">❌ Từ chối</span>'
+      : '<span style="color:#f59e0b;font-weight:700">⏳ Chờ duyệt</span>';
+    const actions = r.status === 'pending' ? `
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn btn-primary btn-sm" style="flex:1" onclick="reviewLeave('${r.id}','approved')">✅ Duyệt</button>
+        <button class="btn btn-sm" style="flex:1;background:var(--danger);color:white" onclick="reviewLeave('${r.id}','rejected')">❌ Từ chối</button>
+      </div>` : '';
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b>${name}</b>${statusBadge}
+      </div>
+      <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">${r.date} · ${shiftLabel}</div>
+      <div style="font-size:0.85rem;margin-top:4px">${r.reason || ''}</div>
+      ${actions}
+    </div>`;
+  }).join('');
+}
+
+async function reviewLeave(id, status) {
+  const user = getCurrentUser();
+  const res = await apiCall('reviewLeaveRequest', { id, status, approvedBy: user?.name || 'Boss' });
+  if (res.ok) {
+    showToast(status === 'approved' ? '✅ Đã duyệt nghỉ phép' : '❌ Đã từ chối', status === 'approved' ? 'success' : 'error');
+    loadLeaveRequestsTab();
+  }
 }
 
 function switchStaffTab(tab) {
