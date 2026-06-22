@@ -1619,8 +1619,7 @@ function markBossNotifRead(data) {
 
 // ─── TỌA ĐỘ VĂN PHÒNG — lưu trên server để mọi thiết bị đọc được ──
 function saveOfficeLocation(data) {
-  const { lat, lng, savedBy } = data;
-  if (!lat || !lng) return { ok: false, error: 'Thiếu lat/lng' };
+  const { lat, lng, ip, savedBy } = data;
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEETS.CONFIG);
   if (!sheet) {
@@ -1633,7 +1632,11 @@ function saveOfficeLocation(data) {
   const valCol = headers.indexOf('value');
   const tsCol  = headers.indexOf('updatedAt');
   const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
-  [['officeLat', String(lat)], ['officeLng', String(lng)]].forEach(([k, v]) => {
+  const pairs = [];
+  if (lat) pairs.push(['officeLat', String(lat)]);
+  if (lng) pairs.push(['officeLng', String(lng)]);
+  if (ip)  pairs.push(['officeIP',  String(ip)]);
+  pairs.forEach(([k, v]) => {
     let found = false;
     for (let r = 1; r < rows.length; r++) {
       if (String(rows[r][keyCol]) === k) {
@@ -1644,21 +1647,23 @@ function saveOfficeLocation(data) {
     }
     if (!found) sheet.appendRow([k, v, now]);
   });
-  return { ok: true, lat, lng };
+  return { ok: true, lat, lng, ip };
 }
 
 function getOfficeLocation() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(SHEETS.CONFIG);
-  if (!sheet) return { ok: true, lat: 21.020672, lng: 105.8177024 };
+  if (!sheet) return { ok: true, lat: 21.020672, lng: 105.8177024, ip: '' };
   const rows = sheet.getDataRange().getValues();
   const headers = rows[0];
   const keyCol = headers.indexOf('key');
   const valCol = headers.indexOf('value');
-  let lat = 21.020672, lng = 105.8177024;
+  let lat = 21.020672, lng = 105.8177024, ip = '';
   for (let r = 1; r < rows.length; r++) {
-    if (String(rows[r][keyCol]) === 'officeLat') lat = parseFloat(rows[r][valCol]) || lat;
-    if (String(rows[r][keyCol]) === 'officeLng') lng = parseFloat(rows[r][valCol]) || lng;
+    const k = String(rows[r][keyCol]);
+    if (k === 'officeLat') lat = parseFloat(rows[r][valCol]) || lat;
+    if (k === 'officeLng') lng = parseFloat(rows[r][valCol]) || lng;
+    if (k === 'officeIP')  ip  = String(rows[r][valCol]) || ip;
   }
-  return { ok: true, lat, lng };
+  return { ok: true, lat, lng, ip };
 }

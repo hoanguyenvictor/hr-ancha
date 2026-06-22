@@ -398,16 +398,31 @@
     </div>
 
     <div class="card" style="border:2px solid #f59e0b">
-      <div class="card-title"><span class="icon">📍</span>Tọa Độ Văn Phòng</div>
+      <div class="card-title"><span class="icon">📍</span>Tọa Độ & IP Văn Phòng</div>
       <p style="font-size:0.82rem;color:var(--muted);margin-bottom:10px">
-        Nếu nhân viên check-in ở văn phòng nhưng bị báo "cách xa" — chị cần cập nhật lại tọa độ đúng của văn phòng.
+        Nhân viên check-in bằng WiFi văn phòng (IP). Nếu dùng 4G mới kiểm tra GPS.
       </p>
       <div id="currentOfficeCoords" style="font-size:0.82rem;background:var(--bg);border-radius:8px;padding:10px;margin-bottom:10px;color:var(--muted)">
         Đang tải...
       </div>
+
+      <!-- IP WiFi -->
+      <div style="margin-bottom:12px">
+        <label style="font-size:0.78rem;font-weight:700;display:block;margin-bottom:4px">🌐 IP WiFi Văn Phòng</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="officeIP" placeholder="Chưa lưu" readonly
+            style="flex:1;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:0.85rem;background:var(--bg);font-weight:700;color:var(--primary)">
+          <button class="btn" style="background:#10b981;color:white;font-weight:700;white-space:nowrap" onclick="getAndSaveOfficeIP()">
+            📡 Lấy IP WiFi
+          </button>
+        </div>
+        <p style="font-size:0.73rem;color:var(--muted);margin-top:4px">Kết nối WiFi văn phòng rồi bấm nút này — chỉ cần làm 1 lần</p>
+      </div>
+
+      <!-- GPS -->
       <div style="display:flex;gap:8px;margin-bottom:10px">
         <div style="flex:1">
-          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:4px">Latitude</label>
+          <label style="font-size:0.78rem;font-weight:600;display:block;margin-bottom:4px">Latitude (GPS dự phòng)</label>
           <input type="number" step="any" id="officeLat" placeholder="21.020672" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:0.82rem;box-sizing:border-box">
         </div>
         <div style="flex:1">
@@ -417,7 +432,7 @@
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn" style="flex:1;background:#f59e0b;color:white;font-weight:700" onclick="getMyLocationForOffice()">
-          📡 Lấy vị trí hiện tại của chị
+          📡 Lấy GPS dự phòng
         </button>
         <button class="btn btn-primary" style="flex:1" onclick="saveOfficeLocation()">
           💾 Lưu tọa độ
@@ -1190,24 +1205,30 @@ function saveSettings() {
 }
 
 async function renderOfficeCoords() {
-  // Luôn fetch từ server để đồng bộ mọi thiết bị
   try {
     const res = await apiCall('getOfficeLocation');
     if (res.ok) {
       localStorage.setItem('officeLat', res.lat);
       localStorage.setItem('officeLng', res.lng);
+      if (res.ip) localStorage.setItem('officeIP', res.ip);
       DB_CONFIG.OFFICE_LAT = res.lat;
       DB_CONFIG.OFFICE_LNG = res.lng;
     }
   } catch(e) {}
   const lat = localStorage.getItem('officeLat') || DB_CONFIG.OFFICE_LAT;
   const lng = localStorage.getItem('officeLng') || DB_CONFIG.OFFICE_LNG;
+  const ip  = localStorage.getItem('officeIP') || '';
   const el = document.getElementById('currentOfficeCoords');
-  if (el) el.innerHTML = `📍 Tọa độ hiện tại: <b>${lat}, ${lng}</b><br><span style="font-size:0.75rem">Nhân viên phải ở trong vòng ${DB_CONFIG.OFFICE_RADIUS_M}m tính từ điểm này</span>`;
+  if (el) el.innerHTML = `
+    ${ip ? `🌐 IP WiFi: <b>${ip}</b><br>` : '⚠️ Chưa lưu IP WiFi<br>'}
+    📍 GPS dự phòng: <b>${lat}, ${lng}</b>
+    <br><span style="font-size:0.73rem;color:var(--muted)">Nhân viên dùng WiFi trước, nếu 4G mới kiểm tra GPS</span>`;
   const latEl = document.getElementById('officeLat');
   const lngEl = document.getElementById('officeLng');
+  const ipEl  = document.getElementById('officeIP');
   if (latEl) latEl.value = lat;
   if (lngEl) lngEl.value = lng;
+  if (ipEl && ip) ipEl.value = ip;
 }
 
 async function getMyLocationForOffice() {
@@ -1225,6 +1246,24 @@ async function getMyLocationForOffice() {
     showToast('❌ Không lấy được GPS. Bật GPS và thử lại.', 'error');
   }
   btn.textContent = '📡 Lấy vị trí hiện tại của chị';
+  btn.disabled = false;
+}
+
+async function getAndSaveOfficeIP() {
+  const btn = event.target;
+  btn.textContent = '⏳ Đang lấy IP...';
+  btn.disabled = true;
+  try {
+    const res = await fetch('https://api.ipify.org?format=json');
+    const { ip } = await res.json();
+    document.getElementById('officeIP').value = ip;
+    const r = await apiCall('saveOfficeLocation', { ip, savedBy: 'boss' });
+    if (r.ok) showToast(`✅ Đã lưu IP WiFi văn phòng: ${ip}`, 'success');
+    else showToast('⚠️ Lấy IP OK nhưng lưu server lỗi', 'warning');
+  } catch(e) {
+    showToast('❌ Không lấy được IP. Kiểm tra kết nối mạng.', 'error');
+  }
+  btn.textContent = '📡 Lấy IP WiFi';
   btn.disabled = false;
 }
 

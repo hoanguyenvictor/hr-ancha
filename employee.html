@@ -622,12 +622,13 @@ async function init() {
   document.getElementById('loginModal').classList.add('hidden');
   state.user = user;
   setupHeader();
-  // Load tọa độ văn phòng mới nhất từ server ngay khi khởi động
+  // Load cấu hình văn phòng (IP + GPS) từ server khi khởi động
   try {
     const locRes = await apiCall('getOfficeLocation');
     if (locRes.ok) {
       localStorage.setItem('officeLat', locRes.lat);
       localStorage.setItem('officeLng', locRes.lng);
+      if (locRes.ip) localStorage.setItem('officeIP', locRes.ip);
       DB_CONFIG.OFFICE_LAT = locRes.lat;
       DB_CONFIG.OFFICE_LNG = locRes.lng;
     }
@@ -869,20 +870,38 @@ async function doShiftAction(shift) {
   try {
     let gps = { ok: true, lat: null, lng: null };
     if (!isOnline) {
-      // Lấy tọa độ văn phòng mới nhất từ server trước khi check
+      // Lấy cấu hình văn phòng từ server (IP + tọa độ GPS)
+      let officeIP = '';
       try {
         const locRes = await apiCall('getOfficeLocation');
         if (locRes.ok) {
           localStorage.setItem('officeLat', locRes.lat);
           localStorage.setItem('officeLng', locRes.lng);
+          if (locRes.ip) { localStorage.setItem('officeIP', locRes.ip); officeIP = locRes.ip; }
           DB_CONFIG.OFFICE_LAT = locRes.lat;
           DB_CONFIG.OFFICE_LNG = locRes.lng;
         }
       } catch(e) {}
-      try { gps = await checkInOffice(); } catch(e) { gps = { ok: false, distance: 0, lat: null, lng: null }; }
-      if (!gps.ok) {
-        // Cảnh báo nhưng vẫn cho check-in — GPS trong nhà không ổn định
-        showToast(`⚠️ GPS cách VP ${gps.distance}m — Ghi nhận vị trí để Boss kiểm tra`, 'warning');
+      officeIP = officeIP || localStorage.getItem('officeIP') || '';
+
+      // Bước 1: Kiểm tra IP WiFi
+      let ipMatch = false;
+      if (officeIP) {
+        try {
+          const ipRes = await fetch('https://api.ipify.org?format=json');
+          const { ip: myIP } = await ipRes.json();
+          ipMatch = (myIP === officeIP);
+        } catch(e) {}
+      }
+
+      if (!ipMatch) {
+        // Bước 2: IP không khớp (dùng 4G) → kiểm tra GPS dự phòng
+        try { gps = await checkInOffice(); } catch(e) { gps = { ok: true, lat: null, lng: null }; }
+        if (!gps.ok) {
+          showToast(`⚠️ WiFi không phải VP, GPS cách ${gps.distance}m — Vẫn ghi nhận để Boss kiểm tra`, 'warning');
+        }
+      } else {
+        showToast('✅ Đã xác nhận WiFi văn phòng', 'success');
       }
     }
     const timeStr = nowTime();
