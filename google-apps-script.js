@@ -1572,7 +1572,7 @@ function getMySubmissions(data) {
 function getMyCheckin(data) {
   const { empId } = data;
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-  const rows = sheetData(SHEETS.CHECKIN).filter(r => r.empId === empId && new Date(r.date) >= cutoff);
+  const rows = sheetData(SHEETS.CHECKIN).filter(r => String(r.empId) === String(empId) && new Date(r.date) >= cutoff);
   return { ok: true, data: rows };
 }
 

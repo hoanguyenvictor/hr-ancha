@@ -1161,21 +1161,48 @@ async function submitChecklist() {
   const doneTasks = allTasks.filter(t => state.checklistState[t.id]);
   if (doneTasks.length === 0) { showToast('Chưa tick việc nào!', 'warning'); return; }
 
+  const submitBtn = document.querySelector('#page-checklist .btn-primary');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '⏳ Đang gửi...'; }
+
   const doneTime = nowTime();
   await Promise.all(doneTasks.map(t =>
     apiCall('updateChecklist', { empId: state.user.id, date: today(), taskId: t.id, done: true, doneTime })
   ));
-  // Lưu các việc chưa tick là false
   const undoneTasks = allTasks.filter(t => !state.checklistState[t.id]);
   await Promise.all(undoneTasks.map(t =>
     apiCall('updateChecklist', { empId: state.user.id, date: today(), taskId: t.id, done: false, doneTime: null })
   ));
 
   state.todayData.checklist = state.checklistState;
+  state.todayData.checklistSubmitted = today();
   localStorage.setItem(`todayData_${today()}`, JSON.stringify(state.todayData));
   await apiCall('createSubmission', { empId: state.user.id, date: today(), totalTasks: allTasks.length, doneTasks: doneTasks.length });
+
+  // Đổi nút thành "Đã gửi" vĩnh viễn trong ngày
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = `✅ Đã gửi Boss (${doneTasks.length}/${allTasks.length} việc)`;
+    submitBtn.style.background = 'var(--success)';
+  }
   showToast(`✅ Đã gửi ${doneTasks.length}/${allTasks.length} việc — chờ Boss xác nhận!`, 'success');
   renderHome();
+}
+
+function restoreChecklistBtnState() {
+  const btn = document.querySelector('#page-checklist .btn-primary');
+  if (!btn) return;
+  const allTasks = [...MORNING_TASKS, ...AFTERNOON_TASKS];
+  const submitted = state.todayData?.checklistSubmitted === today();
+  if (submitted) {
+    const done = allTasks.filter(t => state.checklistState[t.id]).length;
+    btn.disabled = true;
+    btn.textContent = `✅ Đã gửi Boss (${done}/${allTasks.length} việc)`;
+    btn.style.background = 'var(--success)';
+  } else {
+    btn.disabled = false;
+    btn.textContent = '✅ Xác nhận gửi Boss';
+    btn.style.background = '';
+  }
 }
 
 // ─── SUPPLY ────────────────────────────────────────────
@@ -1799,6 +1826,7 @@ function switchPage(name, btn) {
     const navBtns = { home: 0, checklist: 1, overtime: 2, salary: 3, settings: 4 };
     document.querySelectorAll('.nav-item')[navBtns[name] ?? 0].classList.add('active');
   }
+  if (name === 'checklist') { renderChecklist(); restoreChecklistBtnState(); }
   if (name === 'overtime') { renderSchedule(); switchEmpSchedTab('schedule'); }
   if (name === 'salary') renderSalary();
   if (name === 'settings') renderSettingsPage();
