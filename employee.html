@@ -299,6 +299,14 @@
 <!-- ── LỊCH LÀM VIỆC ──────────────────────────────── -->
 <div class="page" id="page-overtime">
 
+  <!-- Tab bar -->
+  <div style="display:flex;gap:6px;margin-bottom:12px;background:var(--surface);border-radius:12px;padding:4px">
+    <button id="emptab-schedule" onclick="switchEmpSchedTab('schedule')" style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.82rem;font-weight:600;cursor:pointer;background:var(--primary);color:white">📅 Lịch</button>
+    <button id="emptab-leave"    onclick="switchEmpSchedTab('leave')"    style="flex:1;padding:8px 4px;border:none;border-radius:9px;font-size:0.82rem;font-weight:600;cursor:pointer;background:transparent;color:var(--muted)">🏥 Xin Nghỉ</button>
+  </div>
+
+  <!-- Tab: Lịch -->
+  <div id="empSchedTab-schedule">
   <!-- Ca tối đang chạy -->
   <div id="eveningShiftActive" class="hidden">
     <div style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:white;border-radius:16px;padding:20px;margin-bottom:12px;text-align:center">
@@ -375,6 +383,43 @@
     </div>
 
   </div>
+  </div><!-- end empSchedTab-schedule -->
+
+  <!-- Tab: Xin Nghỉ -->
+  <div id="empSchedTab-leave" style="display:none">
+    <div class="card" style="background:linear-gradient(135deg,#f59e0b,#ef4444);color:white;margin-bottom:12px">
+      <div style="font-size:0.85rem;opacity:0.9;margin-bottom:4px">Xin nghỉ đột xuất</div>
+      <div style="font-size:1.3rem;font-weight:800">🏥 Ốm / Việc gia đình</div>
+      <div style="font-size:0.78rem;opacity:0.8;margin-top:4px">Gửi trước, chờ chị duyệt — không bị trừ thưởng</div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">📝</span>Gửi Đơn Xin Nghỉ</div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:6px">Ngày xin nghỉ</label>
+        <input type="date" id="leaveDate2" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:0.88rem;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:6px">Ca nghỉ</label>
+        <div style="display:flex;gap:8px">
+          <button id="lshift2-morning"  onclick="selectLeaveShift2('morning')"  style="flex:1;padding:10px 4px;border:2px solid var(--border);border-radius:10px;background:white;font-size:0.82rem;font-weight:600;cursor:pointer">☀️ Ca sáng</button>
+          <button id="lshift2-afternoon" onclick="selectLeaveShift2('afternoon')" style="flex:1;padding:10px 4px;border:2px solid var(--border);border-radius:10px;background:white;font-size:0.82rem;font-weight:600;cursor:pointer">🌆 Ca chiều</button>
+          <button id="lshift2-fullday"   onclick="selectLeaveShift2('fullday')"   style="flex:1;padding:10px 4px;border:2px solid var(--border);border-radius:10px;background:white;font-size:0.82rem;font-weight:600;cursor:pointer">🌅 Cả ngày</button>
+        </div>
+      </div>
+      <div style="margin-bottom:10px">
+        <label style="font-size:0.82rem;font-weight:600;display:block;margin-bottom:6px">Lý do <span style="color:var(--danger)">*</span></label>
+        <textarea id="leaveReason2" placeholder="VD: Em bị sốt 38.5°C, đang điều trị tại nhà..." rows="3"
+          style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:10px;font-size:0.85rem;resize:none;box-sizing:border-box"></textarea>
+      </div>
+      <button class="btn btn-primary" onclick="submitLeaveRequest2()" style="width:100%;background:linear-gradient(135deg,#f59e0b,#ef4444)">
+        📤 Gửi Đơn Xin Nghỉ
+      </button>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">📋</span>Lịch Sử Đơn Nghỉ</div>
+      <div id="leaveHistory2"><p style="color:var(--muted);font-size:0.85rem">Đang tải...</p></div>
+    </div>
+  </div><!-- end empSchedTab-leave -->
 
 </div>
 
@@ -518,9 +563,6 @@
   </button>
   <button class="nav-item" onclick="switchPage('overtime',this)">
     <span class="icon">📅</span><span>Lịch</span>
-  </button>
-  <button class="nav-item" onclick="switchPage('leave',this)">
-    <span class="icon">🏥</span><span>Xin Nghỉ</span>
   </button>
   <button class="nav-item" onclick="switchPage('salary',this)">
     <span class="icon">💰</span><span>Lương</span>
@@ -1754,15 +1796,14 @@ function switchPage(name, btn) {
   document.getElementById(`page-${name}`).classList.add('active');
   if (btn) btn.classList.add('active');
   else {
-    const navBtns = { home: 0, checklist: 1, overtime: 2, leave: 3, salary: 4, settings: 5 };
+    const navBtns = { home: 0, checklist: 1, overtime: 2, salary: 3, settings: 4 };
     document.querySelectorAll('.nav-item')[navBtns[name] ?? 0].classList.add('active');
   }
-  if (name === 'overtime') renderSchedule();
+  if (name === 'overtime') { renderSchedule(); switchEmpSchedTab('schedule'); }
   if (name === 'salary') renderSalary();
   if (name === 'settings') renderSettingsPage();
   if (name === 'emp-notifications') loadEmpNotifications();
   if (name === 'diary') { window._diaryFilter = window._diaryFilter || 'day'; loadEmpDiary(); }
-  if (name === 'leave') initLeavePage();
 }
 
 // ─── NHẬT KÝ NHÂN VIÊN ────────────────────────────────────
@@ -2241,6 +2282,91 @@ async function loadLeaveHistory() {
       </div>
       <div style="font-size:0.82rem;color:var(--muted)">${r.reason}</div>
       ${r.photoUrl ? `<img src="${r.photoUrl}" style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:6px">` : ''}
+    </div>`).join('');
+}
+
+// ─── TAB LỊCH / XIN NGHỈ (trong page-overtime) ────────────
+function switchEmpSchedTab(tab) {
+  ['schedule','leave'].forEach(t => {
+    const el  = document.getElementById(`empSchedTab-${t}`);
+    const btn = document.getElementById(`emptab-${t}`);
+    if (!el || !btn) return;
+    const active = t === tab;
+    el.style.display = active ? '' : 'none';
+    btn.style.background = active ? 'var(--primary)' : 'transparent';
+    btn.style.color = active ? 'white' : 'var(--muted)';
+  });
+  if (tab === 'leave') {
+    const d = document.getElementById('leaveDate2');
+    if (d && !d.value) d.value = today();
+    loadLeaveHistory2();
+  }
+}
+
+let _leaveShift2 = '';
+function selectLeaveShift2(shift) {
+  _leaveShift2 = shift;
+  ['morning','afternoon','fullday'].forEach(s => {
+    const btn = document.getElementById(`lshift2-${s}`);
+    if (!btn) return;
+    btn.style.background     = s === shift ? '#f59e0b' : 'white';
+    btn.style.color          = s === shift ? 'white'   : 'var(--text)';
+    btn.style.borderColor    = s === shift ? '#f59e0b' : 'var(--border)';
+  });
+}
+
+async function submitLeaveRequest2() {
+  if (!state.user) return;
+  const date   = document.getElementById('leaveDate2').value;
+  const reason = document.getElementById('leaveReason2').value.trim();
+  if (!date)         { showToast('Vui lòng chọn ngày xin nghỉ', 'error'); return; }
+  if (!_leaveShift2) { showToast('Vui lòng chọn ca nghỉ', 'error'); return; }
+  if (!reason)       { showToast('Vui lòng ghi rõ lý do', 'error'); return; }
+
+  const btn = document.getElementById('empSchedTab-leave').querySelector('.btn-primary');
+  btn.disabled = true; btn.textContent = '⏳ Đang gửi...';
+
+  const res = await apiCall('submitLeaveRequest', {
+    empId: state.user.id, date, shift: _leaveShift2, reason, photoUrl: ''
+  });
+
+  btn.disabled = false; btn.innerHTML = '📤 Gửi Đơn Xin Nghỉ';
+
+  if (res.ok) {
+    showToast('✅ Đã gửi đơn! Chờ chị duyệt.', 'success');
+    document.getElementById('leaveReason2').value = '';
+    _leaveShift2 = '';
+    ['morning','afternoon','fullday'].forEach(s => {
+      const b = document.getElementById(`lshift2-${s}`);
+      if (b) { b.style.background='white'; b.style.color='var(--text)'; b.style.borderColor='var(--border)'; }
+    });
+    loadLeaveHistory2();
+  } else {
+    showToast('Gửi thất bại, thử lại nhé', 'error');
+  }
+}
+
+async function loadLeaveHistory2() {
+  if (!state.user) return;
+  const res = await apiCall('getMyLeaveRequests', { empId: state.user.id });
+  const el  = document.getElementById('leaveHistory2');
+  if (!el) return;
+  if (!res.ok || !res.data || !res.data.length) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:0.85rem">Chưa có đơn nào</p>';
+    return;
+  }
+  const shiftLbl = s => s === 'morning' ? 'Ca sáng' : s === 'afternoon' ? 'Ca chiều' : 'Cả ngày';
+  const badge = s => {
+    if (s === 'approved') return '<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:20px;font-size:0.75rem;font-weight:700">✅ Đã duyệt</span>';
+    if (s === 'rejected') return '<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:20px;font-size:0.75rem;font-weight:700">❌ Từ chối</span>';
+    return '<span style="background:#fef9c3;color:#b45309;padding:2px 8px;border-radius:20px;font-size:0.75rem;font-weight:700">⏳ Chờ duyệt</span>';
+  };
+  el.innerHTML = res.data.slice(0,10).map(r => `
+    <div style="border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+        <b style="font-size:0.88rem">${r.date} — ${shiftLbl(r.shift)}</b>${badge(r.status)}
+      </div>
+      <div style="font-size:0.82rem;color:var(--muted)">${r.reason}</div>
     </div>`).join('');
 }
 </script>
