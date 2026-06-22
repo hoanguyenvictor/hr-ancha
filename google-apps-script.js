@@ -406,6 +406,35 @@ function updateRow(name, matchField, matchVal, updates) {
   return false;
 }
 
+// ─── MIGRATION: thêm cột còn thiếu vào sheet CHECKIN ────
+// Chạy 1 lần trong Apps Script Editor: migrateCheckinSheet()
+function migrateCheckinSheet() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checkin');
+  if (!sheet) { Logger.log('Không tìm thấy sheet Checkin'); return; }
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  Logger.log('Headers hiện tại: ' + headers.join(', '));
+
+  // Danh sách cột cần có (theo thứ tự chuẩn)
+  var required = ['empId','date','shift','checkinTime','checkoutTime','lat','lng','late','lateMin','early','earlyMin','approved'];
+  var added = [];
+
+  required.forEach(function(col) {
+    if (headers.indexOf(col) < 0) {
+      var newCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, newCol).setValue(col);
+      headers.push(col);
+      added.push(col);
+      Logger.log('Đã thêm cột: ' + col);
+    }
+  });
+
+  if (added.length === 0) {
+    Logger.log('✅ Sheet Checkin đã có đủ cột, không cần migration');
+  } else {
+    Logger.log('✅ Migration xong — đã thêm: ' + added.join(', '));
+  }
+}
+
 function hashPass(pass) {
   return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, pass)
     .map(b => ('0' + (b & 0xFF).toString(16)).slice(-2)).join('');
