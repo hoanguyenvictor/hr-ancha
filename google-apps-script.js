@@ -625,15 +625,16 @@ function getTodayReports(data) {
   const overtime = sheetData(SHEETS.OVERTIME).filter(r => r.date === date && r.status === 'active');
 
   const reports = {};
-  employees.forEach(emp => {
-    const empCheckins = checkins.filter(r => String(r.empId) === String(emp.id));
-    const morning   = empCheckins.find(r => (r.shift || 'morning') === 'morning') || {};
-    const afternoon = empCheckins.find(r => r.shift === 'afternoon') || {};
+  employees.forEach(function(emp) {
+    const empCheckins = checkins.filter(function(r) { return String(r.empId) === String(emp.id); });
+    const morning   = empCheckins.find(function(r) { return (r.shift || 'morning') === 'morning'; }) || {};
+    const afternoon = empCheckins.find(function(r) { return r.shift === 'afternoon'; }) || {};
+    const evening   = empCheckins.find(function(r) { return r.shift === 'evening'; }) || {};
     const cl = {};
-    checklists.filter(r => String(r.empId) === String(emp.id)).forEach(r => { cl[r.taskId] = r.done === 'TRUE'; });
-    const sup = supplies.find(r => String(r.empId) === String(emp.id));
-    const missedPing = pings.some(r => String(r.empId) === String(emp.id));
-    const activeShift = overtime.some(r => String(r.empId) === String(emp.id));
+    checklists.filter(function(r) { return String(r.empId) === String(emp.id); }).forEach(function(r) { cl[r.taskId] = r.done === 'TRUE'; });
+    const sup = supplies.find(function(r) { return String(r.empId) === String(emp.id); });
+    const missedPing = pings.some(function(r) { return String(r.empId) === String(emp.id); });
+    const activeShift = overtime.some(function(r) { return String(r.empId) === String(emp.id); });
 
     reports[emp.id] = {
       checkin:           morning.checkinTime   || afternoon.checkinTime  || null,
@@ -646,6 +647,9 @@ function getTodayReports(data) {
       afternoonCheckout: afternoon.checkoutTime || null,
       afternoonLate:     afternoon.late === 'TRUE',
       afternoonLateMin:  Number(afternoon.lateMin) || 0,
+      eveningCheckin:    evening.checkinTime   || null,
+      eveningCheckout:   evening.checkoutTime  || null,
+      eveningLate:       evening.late === 'TRUE',
       late:    morning.late === 'TRUE' || afternoon.late === 'TRUE',
       lateMin: Number(morning.lateMin || afternoon.lateMin) || 0,
       checklist: cl,

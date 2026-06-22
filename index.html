@@ -767,7 +767,7 @@ function empRowHTML(emp) {
   const lines = [
     caLine('☀️', r.morningCheckin, r.morningLate, r.morningCheckout),
     caLine('🌆', r.afternoonCheckin, r.afternoonLate, r.afternoonCheckout),
-    ...(r.activeShift ? [caLine('🌙', r.eveningCheckin, false, r.eveningCheckout)] : [])
+    ...(r.eveningCheckin || r.activeShift ? [caLine('🌙', r.eveningCheckin, r.eveningLate, r.eveningCheckout)] : [])
   ];
 
   const initials = emp.name.split(' ').slice(-2).map(w=>w[0]).join('').toUpperCase();
@@ -1497,6 +1497,7 @@ function switchPage(name, btn) {
     const navBtns = document.querySelectorAll('.nav-item');
     if (navBtns[idx[name] ?? 0]) navBtns[idx[name] ?? 0].classList.add('active');
   }
+  if (name === 'overview') { loadTodayReports().then(renderOverview); }
   if (name === 'staff') { loadEmployees(); loadOvertimeList(); }
   if (name === 'schedule') renderScheduleTab();
   if (name === 'notifications') { loadLeaveRequests(); loadNotifications(); loadAttendanceReports(); }
