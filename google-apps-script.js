@@ -487,21 +487,37 @@ function handleCheckout(data) {
   const shiftIdx = headers.indexOf('shift');
   const empIdx = headers.indexOf('empId');
   const dateIdx = headers.indexOf('date');
+  let found = false;
   for (let i = 1; i < vals.length; i++) {
     const rowShift = shiftIdx >= 0 ? (vals[i][shiftIdx] || 'morning') : 'morning';
-    if (vals[i][empIdx] === empId && vals[i][dateIdx] === date && rowShift === shiftKey) {
+    if (String(vals[i][empIdx]) === String(empId) && String(vals[i][dateIdx]) === String(date) && rowShift === shiftKey) {
       const coIdx = headers.indexOf('checkoutTime');
       const earlyIdx = headers.indexOf('early');
       const earlyMinIdx = headers.indexOf('earlyMin');
       if (coIdx >= 0) sheet.getRange(i+1, coIdx+1).setValue(time);
       if (earlyIdx >= 0) sheet.getRange(i+1, earlyIdx+1).setValue(early?'TRUE':'FALSE');
       if (earlyMinIdx >= 0) sheet.getRange(i+1, earlyMinIdx+1).setValue(earlyMin||0);
+      found = true;
       break;
     }
   }
+  if (!found) {
+    log('checkout_warn', `Không tìm thấy dòng checkin để cập nhật checkout: empId=${empId} date=${date} shift=${shiftKey}`);
+  }
   log('checkout', `${empId} - ${date} ${shiftKey} ${time}${early?' VỀ SỚM '+earlyMin+'p':''}`);
   if (early) addAutoPenalty(empId, date, `Về sớm ca ${shiftKey === 'morning' ? 'sáng' : 'chiều'}`, `Về sớm ${earlyMin} phút`);
-  return { ok: true };
+  // Thông báo boss
+  const empsCo = sheetData(SHEETS.EMPLOYEES);
+  const empCo = empsCo.find(function(e){ return String(e.id) === String(empId); });
+  const empNameCo = empCo ? empCo.name : empId;
+  const shiftLabelCo = shiftKey === 'morning' ? '☀️ Ca sáng' : shiftKey === 'afternoon' ? '🌆 Ca chiều' : '🌙 Ca tối';
+  const earlyNote = early ? ` ⚠️ Về sớm ${earlyMin} phút` : ' ✅';
+  sendTelegram('🏁 <b>Check-out</b>\n👤 ' + empNameCo + '\n' + shiftLabelCo + ' · ' + time + earlyNote + '\n📅 ' + date);
+  const ss3 = SpreadsheetApp.getActiveSpreadsheet();
+  var nSheet3 = ss3.getSheetByName('BossNotifications');
+  if (!nSheet3) { nSheet3 = ss3.insertSheet('BossNotifications'); nSheet3.appendRow(['date','type','message','read']); }
+  nSheet3.appendRow([date, 'checkout', '🏁 ' + empNameCo + ' check-out ' + shiftLabelCo + ' lúc ' + time + earlyNote, 'false']);
+  return { ok: true, found: found };
 }
 
 function addAutoPenalty(empId, date, reason, note) {
