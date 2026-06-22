@@ -584,7 +584,9 @@ function getTodayReports(data) {
 
   const reports = {};
   employees.forEach(emp => {
-    const ci = checkins.find(r => String(r.empId) === String(emp.id)) || {};
+    const empCheckins = checkins.filter(r => String(r.empId) === String(emp.id));
+    const morning   = empCheckins.find(r => (r.shift || 'morning') === 'morning') || {};
+    const afternoon = empCheckins.find(r => r.shift === 'afternoon') || {};
     const cl = {};
     checklists.filter(r => String(r.empId) === String(emp.id)).forEach(r => { cl[r.taskId] = r.done === 'TRUE'; });
     const sup = supplies.find(r => String(r.empId) === String(emp.id));
@@ -592,10 +594,18 @@ function getTodayReports(data) {
     const activeShift = overtime.some(r => String(r.empId) === String(emp.id));
 
     reports[emp.id] = {
-      checkin: ci.checkinTime || null,
-      checkout: ci.checkoutTime || null,
-      late: ci.late === 'TRUE',
-      lateMin: Number(ci.lateMin) || 0,
+      checkin:           morning.checkinTime   || afternoon.checkinTime  || null,
+      checkout:          morning.checkoutTime  || afternoon.checkoutTime || null,
+      morningCheckin:    morning.checkinTime   || null,
+      morningCheckout:   morning.checkoutTime  || null,
+      morningLate:       morning.late === 'TRUE',
+      morningLateMin:    Number(morning.lateMin) || 0,
+      afternoonCheckin:  afternoon.checkinTime  || null,
+      afternoonCheckout: afternoon.checkoutTime || null,
+      afternoonLate:     afternoon.late === 'TRUE',
+      afternoonLateMin:  Number(afternoon.lateMin) || 0,
+      late:    morning.late === 'TRUE' || afternoon.late === 'TRUE',
+      lateMin: Number(morning.lateMin || afternoon.lateMin) || 0,
       checklist: cl,
       supply: sup ? { data: sup, hasAlert: sup.hasAlert === 'TRUE' } : null,
       pingMiss: missedPing,

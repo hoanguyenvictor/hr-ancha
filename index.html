@@ -728,17 +728,24 @@ function renderOverview() {
 
 function empRowHTML(emp) {
   const r = todayReports[emp.id] || {};
-  const checkin = r.checkin || null;
   const allTasks = 10;
   const done = Object.values(r.checklist || {}).filter(Boolean).length;
   const alerts = buildEmpAlerts(emp, r);
+
+  const ciMorning = r.morningCheckin
+    ? `☀️ ${r.morningCheckin}${r.morningLate ? ' ⚠️' : ' ✅'}${r.morningCheckout ? ' → ' + r.morningCheckout : ' (chưa out)'}`
+    : '☀️ ❌ Chưa vào';
+  const ciAfternoon = r.afternoonCheckin
+    ? `🌤 ${r.afternoonCheckin}${r.afternoonLate ? ' ⚠️' : ' ✅'}${r.afternoonCheckout ? ' → ' + r.afternoonCheckout : ' (chưa out)'}`
+    : '🌤 ❌ Chưa vào';
 
   const initials = emp.name.split(' ').slice(-2).map(w=>w[0]).join('').toUpperCase();
   return `<div class="emp-row" onclick="showEmpDetail('${emp.id}')">
     <div class="avatar" style="background:${emp.color||'#667eea'}">${initials}</div>
     <div class="emp-info">
       <div class="emp-name">${emp.name}</div>
-      <div class="emp-status">${checkin ? `Check-in ${checkin}${r.late?' ⚠️ Trễ '+r.lateMin+'p':''}` : '❌ Chưa check-in'} · ${done}/${allTasks} việc</div>
+      <div class="emp-status" style="font-size:0.75rem">${ciMorning} &nbsp;|&nbsp; ${ciAfternoon}</div>
+      <div class="emp-status" style="font-size:0.75rem;margin-top:2px">✅ Checklist: ${done}/${allTasks} việc</div>
       <div class="emp-badges">
         ${alerts.map(a => `<span class="badge badge-${a.type}" style="font-size:0.65rem">${a.short}</span>`).join('')}
         ${r.activeShift ? '<span class="badge badge-warning" style="font-size:0.65rem">🌙 Ca tối</span>' : ''}
@@ -847,17 +854,32 @@ function renderSupplyOverview() {
 }
 
 // ─── EMPLOYEE DETAIL ───────────────────────────────────
-function showEmpDetail(empId) {
+async function showEmpDetail(empId) {
   const emp = employees.find(e => e.id === empId);
   if (!emp) return;
+  // Reload dữ liệu mới nhất trước khi hiển thị
+  await loadTodayReports();
   const r = todayReports[empId] || {};
   const MORNING = ['m1','m2','m3','m4','m5'];
   const AFTERNOON = ['a1','a2','a3','a4','a5'];
   const TASK_NAMES = {
-    m1:'Dọn dẹp VP',m2:'Lau bàn ghế',m3:'Kiểm máy móc',m4:'Chuẩn bị dụng cụ',m5:'Check đơn hàng',
-    a1:'Dọn dẹp cuối ngày',a2:'Xếp hàng hoá',a3:'Thu dọn dụng cụ',a4:'Tắt thiết bị',a5:'Khoá cửa'
+    m1:'Dọn dẹp VP', m2:'Lau bàn ghế', m3:'Kiểm máy móc', m4:'Chuẩn bị dụng cụ', m5:'Check đơn hàng',
+    a1:'Dọn dẹp cuối ngày', a2:'Xếp hàng hoá', a3:'Thu dọn dụng cụ', a4:'Tắt thiết bị điện', a5:'Khoá cửa'
   };
   const initials = emp.name.split(' ').slice(-2).map(w=>w[0]).join('').toUpperCase();
+
+  const ciRow = (label, time, late, lateMin, checkout) => {
+    if (!time) return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85rem">
+      <span style="color:var(--muted)">${label}</span><span style="color:var(--danger);font-weight:700">❌ Chưa check-in</span></div>`;
+    const lateTag = late ? `<span style="color:#f59e0b;font-size:0.75rem"> ⚠️ Trễ ${lateMin}p</span>` : `<span style="color:var(--success);font-size:0.75rem"> ✅</span>`;
+    const coTag = checkout ? `<span style="color:var(--muted);font-size:0.78rem"> → out ${checkout}</span>` : `<span style="color:#f59e0b;font-size:0.75rem"> (chưa out)</span>`;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:0.85rem">
+      <span style="font-weight:600">${label}</span>
+      <span>${time}${lateTag}${coTag}</span></div>`;
+  };
+
+  const doneMorning   = MORNING.filter(id => r.checklist?.[id]).length;
+  const doneAfternoon = AFTERNOON.filter(id => r.checklist?.[id]).length;
 
   document.getElementById('empDetailContent').innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
@@ -872,27 +894,26 @@ function showEmpDetail(empId) {
       </button>
     </div>
 
-    <div class="stat-grid" style="margin-bottom:14px">
-      <div class="stat-box"><div class="stat-num" style="color:${r.checkin?'var(--success)':'var(--danger)'};font-size:1.1rem">${r.checkin||'—'}</div><div class="stat-label">Check-in</div></div>
-      <div class="stat-box"><div class="stat-num" style="font-size:1.1rem">${r.checkout||'—'}</div><div class="stat-label">Check-out</div></div>
-    </div>
+    <div style="font-size:0.82rem;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Check-in hôm nay</div>
+    ${ciRow('☀️ Ca sáng', r.morningCheckin, r.morningLate, r.morningLateMin, r.morningCheckout)}
+    ${ciRow('🌤 Ca chiều', r.afternoonCheckin, r.afternoonLate, r.afternoonLateMin, r.afternoonCheckout)}
 
-    <div style="font-size:0.82rem;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase">Checklist Sáng</div>
-    ${MORNING.map(id => `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:0.85rem;border-bottom:1px solid var(--border)">
-      <span>${r.checklist?.[id]?'✅':'⬜'}</span>
-      <span style="${r.checklist?.[id]?'':'color:var(--muted)'}">${TASK_NAMES[id]}</span>
+    <div style="font-size:0.82rem;font-weight:700;color:var(--muted);margin:14px 0 8px;text-transform:uppercase">Checklist Sáng (${doneMorning}/5)</div>
+    ${MORNING.map(id => `<div style="display:flex;gap:8px;align-items:center;padding:5px 0;font-size:0.85rem;border-bottom:1px solid var(--border)">
+      <span>${r.checklist?.[id] ? '✅' : '⬜'}</span>
+      <span style="${r.checklist?.[id] ? '' : 'color:var(--muted)'}">${TASK_NAMES[id]}</span>
     </div>`).join('')}
 
-    <div style="font-size:0.82rem;font-weight:700;color:var(--muted);margin:12px 0 8px;text-transform:uppercase">Checklist Chiều</div>
-    ${AFTERNOON.map(id => `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;font-size:0.85rem;border-bottom:1px solid var(--border)">
-      <span>${r.checklist?.[id]?'✅':'⬜'}</span>
-      <span style="${r.checklist?.[id]?'':'color:var(--muted)'}">${TASK_NAMES[id]}</span>
+    <div style="font-size:0.82rem;font-weight:700;color:var(--muted);margin:14px 0 8px;text-transform:uppercase">Checklist Chiều (${doneAfternoon}/5)</div>
+    ${AFTERNOON.map(id => `<div style="display:flex;gap:8px;align-items:center;padding:5px 0;font-size:0.85rem;border-bottom:1px solid var(--border)">
+      <span>${r.checklist?.[id] ? '✅' : '⬜'}</span>
+      <span style="${r.checklist?.[id] ? '' : 'color:var(--muted)'}">${TASK_NAMES[id]}</span>
     </div>`).join('')}
 
     ${r.supply ? `
-    <div style="font-size:0.82rem;font-weight:700;color:var(--muted);margin:12px 0 8px;text-transform:uppercase">Báo Cáo Kho</div>
+    <div style="font-size:0.82rem;font-weight:700;color:var(--muted);margin:14px 0 8px;text-transform:uppercase">Báo Cáo Kho</div>
     <div style="font-size:0.83rem;background:var(--bg);border-radius:8px;padding:10px">
-      ${Object.entries(r.supply.data||{}).map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:3px 0"><span>${k}</span><b>${v}</b></div>`).join('')}
+      ${Object.entries(r.supply.data||{}).filter(([k])=>!['empId','date','time','hasAlert','reportedBy','onBehalfOf'].includes(k)).map(([k,v])=>v?`<div style="display:flex;justify-content:space-between;padding:3px 0"><span>${k}</span><b>${v}</b></div>`:'').join('')}
     </div>` : ''}
 
     <div style="display:flex;gap:8px;margin-top:16px">
