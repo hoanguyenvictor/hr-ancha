@@ -859,6 +859,16 @@ async function doShiftAction(shift) {
   try {
     let gps = { ok: true, lat: null, lng: null };
     if (!isOnline) {
+      // Lấy tọa độ văn phòng mới nhất từ server trước khi check
+      try {
+        const locRes = await apiCall('getOfficeLocation');
+        if (locRes.ok) {
+          localStorage.setItem('officeLat', locRes.lat);
+          localStorage.setItem('officeLng', locRes.lng);
+          DB_CONFIG.OFFICE_LAT = locRes.lat;
+          DB_CONFIG.OFFICE_LNG = locRes.lng;
+        }
+      } catch(e) {}
       gps = await checkInOffice();
       if (!gps.ok) {
         showToast(gps.error || `❌ Bạn cách văn phòng ${gps.distance}m (cần trong ${DB_CONFIG.OFFICE_RADIUS_M}m)`, 'danger');

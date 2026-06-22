@@ -214,6 +214,7 @@ const SHEETS = {
   RETURN_SUBS:       'ReturnSubmissions',
   ASSIGNED_TASKS:    'AssignedTasks',
   LEAVE_REQUESTS:    'LeaveRequests',
+  CONFIG:            'Config',
 };
 
 // ─── ENTRY POINT (GET — tránh CORS) ──────────────────────────────
@@ -297,6 +298,8 @@ function doGet(e) {
       case 'getLeaveRequests':      result = getLeaveRequests(data); break;
       case 'reviewLeaveRequest':    result = reviewLeaveRequest(data); break;
       case 'getMyLeaveRequests':    result = getMyLeaveRequests(data); break;
+      case 'saveOfficeLocation':    result = saveOfficeLocation(data); break;
+      case 'getOfficeLocation':     result = getOfficeLocation(); break;
       default: result = { ok: false, error: 'Unknown action: ' + action };
     }
 
@@ -1612,4 +1615,50 @@ function markBossNotifRead(data) {
   const readCol = headers.indexOf('read') + 1;
   if (readCol > 0) sheet.getRange(row, readCol).setValue('true');
   return { ok: true };
+}
+
+// ─── TỌA ĐỘ VĂN PHÒNG — lưu trên server để mọi thiết bị đọc được ──
+function saveOfficeLocation(data) {
+  const { lat, lng, savedBy } = data;
+  if (!lat || !lng) return { ok: false, error: 'Thiếu lat/lng' };
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEETS.CONFIG);
+    sheet.getRange(1, 1, 1, 3).setValues([['key', 'value', 'updatedAt']]);
+  }
+  const rows = sheet.getDataRange().getValues();
+  const headers = rows[0];
+  const keyCol = headers.indexOf('key');
+  const valCol = headers.indexOf('value');
+  const tsCol  = headers.indexOf('updatedAt');
+  const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm:ss');
+  [['officeLat', String(lat)], ['officeLng', String(lng)]].forEach(([k, v]) => {
+    let found = false;
+    for (let r = 1; r < rows.length; r++) {
+      if (String(rows[r][keyCol]) === k) {
+        sheet.getRange(r + 1, valCol + 1).setValue(v);
+        sheet.getRange(r + 1, tsCol  + 1).setValue(now);
+        found = true; break;
+      }
+    }
+    if (!found) sheet.appendRow([k, v, now]);
+  });
+  return { ok: true, lat, lng };
+}
+
+function getOfficeLocation() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(SHEETS.CONFIG);
+  if (!sheet) return { ok: true, lat: 21.020672, lng: 105.8177024 };
+  const rows = sheet.getDataRange().getValues();
+  const headers = rows[0];
+  const keyCol = headers.indexOf('key');
+  const valCol = headers.indexOf('value');
+  let lat = 21.020672, lng = 105.8177024;
+  for (let r = 1; r < rows.length; r++) {
+    if (String(rows[r][keyCol]) === 'officeLat') lat = parseFloat(rows[r][valCol]) || lat;
+    if (String(rows[r][keyCol]) === 'officeLng') lng = parseFloat(rows[r][valCol]) || lng;
+  }
+  return { ok: true, lat, lng };
 }

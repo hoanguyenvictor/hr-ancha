@@ -1213,17 +1213,23 @@ async function getMyLocationForOffice() {
   btn.disabled = false;
 }
 
-function saveOfficeLocation() {
+async function saveOfficeLocation() {
   const lat = parseFloat(document.getElementById('officeLat').value);
   const lng = parseFloat(document.getElementById('officeLng').value);
   if (!lat || !lng) { showToast('Nhập đủ tọa độ trước nhé chị!', 'error'); return; }
+  // Lưu local ngay để áp dụng phiên này
   localStorage.setItem('officeLat', lat);
   localStorage.setItem('officeLng', lng);
-  // Ghi vào DB_CONFIG để áp dụng ngay trong phiên này
   DB_CONFIG.OFFICE_LAT = lat;
   DB_CONFIG.OFFICE_LNG = lng;
   renderOfficeCoords();
-  showToast(`✅ Đã lưu tọa độ văn phòng: ${lat}, ${lng}`, 'success');
+  // Lưu lên server để nhân viên mọi thiết bị đều đọc được
+  const res = await apiCall('saveOfficeLocation', { lat, lng, savedBy: 'boss' });
+  if (res.ok) {
+    showToast(`✅ Đã lưu lên server: ${lat}, ${lng} — nhân viên sẽ dùng tọa độ này`, 'success');
+  } else {
+    showToast(`⚠️ Lưu local OK nhưng server lỗi — kiểm tra kết nối`, 'warning');
+  }
 }
 
 function copyEmployeeLink() {
