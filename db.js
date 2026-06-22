@@ -7,7 +7,7 @@ const DB_CONFIG = {
   SCRIPT_URL: 'https://script.google.com/macros/s/AKfycbz5yjTpDcbJvvKfrDrTnU_Xoloh7OzY0L-KkM3U8C3Whb5JSkc2hnv2y2W6lyq1E8nm7w/exec',
   OFFICE_LAT: 21.020672,
   OFFICE_LNG: 105.8177024,
-  OFFICE_RADIUS_M: 150,        // Bán kính cho phép check-in (mét)
+  OFFICE_RADIUS_M: 300,        // Bán kính cho phép check-in (mét)
   MORNING_START: '08:00',      // Ca sáng bắt đầu
   MORNING_END:   '12:00',      // Ca sáng kết thúc
   AFTERNOON_START: '13:00',    // Ca chiều bắt đầu

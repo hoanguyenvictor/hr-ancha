@@ -881,7 +881,11 @@ async function doShiftAction(shift) {
       } catch(e) {}
       gps = await checkInOffice();
       if (!gps.ok) {
-        showToast(gps.error || `❌ Bạn cách văn phòng ${gps.distance}m (cần trong ${DB_CONFIG.OFFICE_RADIUS_M}m)`, 'danger');
+        const officeLat = (parseFloat(localStorage.getItem('officeLat')) || DB_CONFIG.OFFICE_LAT).toFixed(4);
+        const officeLng = (parseFloat(localStorage.getItem('officeLng')) || DB_CONFIG.OFFICE_LNG).toFixed(4);
+        const empLat = gps.lat ? gps.lat.toFixed(4) : '?';
+        const empLng = gps.lng ? gps.lng.toFixed(4) : '?';
+        showToast(`❌ Cách VP ${gps.distance}m | GPS bạn: ${empLat},${empLng} | VP: ${officeLat},${officeLng}`, 'danger');
         btn.disabled = false;
         btn.textContent = isCheckin ? '📍 Check-in' : '🏁 Check-out';
         return;
