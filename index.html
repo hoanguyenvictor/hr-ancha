@@ -1205,9 +1205,11 @@ async function confirmSalary() {
 // ─── SETTINGS ──────────────────────────────────────────
 function loadSettings() {
   const s = JSON.parse(localStorage.getItem('hrSettings') || '{}');
-  if (s.scriptUrl) {
-    DB_CONFIG.SCRIPT_URL = s.scriptUrl;
-    document.getElementById('settingScriptUrl').value = s.scriptUrl;
+  // Ưu tiên localStorage, fallback về URL cứng trong db.js
+  const url = s.scriptUrl || DB_CONFIG.SCRIPT_URL;
+  if (url && url !== 'YOUR_GOOGLE_APPS_SCRIPT_URL') {
+    DB_CONFIG.SCRIPT_URL = url;
+    document.getElementById('settingScriptUrl').value = url;
   }
   if (s.radius) document.getElementById('settingRadius').value = s.radius;
   if (s.otRate) document.getElementById('settingOTRate').value = s.otRate;
