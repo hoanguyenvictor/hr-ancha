@@ -1,22 +1,19 @@
 {
-  "name": "Quản Lý Nhân Sự",
-  "short_name": "HR App",
-  "description": "Hệ thống quản lý nhân sự nội bộ",
-  "start_url": "/",
+  "name": "Boss Ancha",
+  "short_name": "Boss",
+  "description": "Boss Dashboard — Quản lý nhân sự Ancha",
+  "start_url": "/hr-ancha/index.html",
+  "scope": "/hr-ancha/",
   "display": "standalone",
   "background_color": "#667eea",
   "theme_color": "#667eea",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "/hr-ancha/icon-boss.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }
