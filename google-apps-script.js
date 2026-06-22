@@ -1659,11 +1659,18 @@ function getOfficeLocation() {
   const keyCol = headers.indexOf('key');
   const valCol = headers.indexOf('value');
   let lat = 21.020672, lng = 105.8177024, ip = '';
+  const parseCoord = function(v) {
+    var n = parseFloat(String(v).replace(',', '.'));
+    if (!n) return 0;
+    // Nếu bị lưu nhân 10^7 (ví dụ 210589846 thay vì 21.0589846)
+    if (Math.abs(n) > 1000) n = n / 10000000;
+    return n;
+  };
   for (let r = 1; r < rows.length; r++) {
     const k = String(rows[r][keyCol]);
-    if (k === 'officeLat') lat = parseFloat(rows[r][valCol]) || lat;
-    if (k === 'officeLng') lng = parseFloat(rows[r][valCol]) || lng;
-    if (k === 'officeIP')  ip  = String(rows[r][valCol]) || ip;
+    if (k === 'officeLat') { const v = parseCoord(rows[r][valCol]); if (v) lat = v; }
+    if (k === 'officeLng') { const v = parseCoord(rows[r][valCol]); if (v) lng = v; }
+    if (k === 'officeIP')  ip = String(rows[r][valCol]) || ip;
   }
   return { ok: true, lat, lng, ip };
 }
