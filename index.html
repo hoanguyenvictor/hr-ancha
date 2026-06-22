@@ -71,6 +71,7 @@
     padding: 24px 20px; width: 100%; max-height: 85vh;
     overflow-y: auto; animation: slideUp .3s ease;
   }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -117,7 +118,7 @@
       <button onclick="switchPage('notifications',this)" style="position:relative;background:rgba(255,255,255,0.2);border:none;color:white;border-radius:8px;padding:6px 10px;font-size:0.75rem;cursor:pointer">
         🔔<span id="notifBadge" class="hidden" style="position:absolute;top:-4px;right:-4px;background:#ef4444;color:white;border-radius:10px;padding:1px 5px;font-size:0.65rem;font-weight:700"></span>
       </button>
-      <button onclick="refreshAll()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:8px;padding:6px 10px;font-size:0.75rem;cursor:pointer">🔄</button>
+      <button id="refreshBtn" onclick="refreshAll()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:8px;padding:6px 10px;font-size:0.75rem;cursor:pointer;transition:transform 0.3s">🔄</button>
       <button onclick="bossLogout()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:8px;padding:6px 10px;font-size:0.75rem;cursor:pointer">Thoát</button>
     </div>
   </div>
@@ -638,6 +639,11 @@ async function autoRefresh() {
 }
 
 async function refreshAll() {
+  const btn = document.getElementById('refreshBtn');
+  if (btn) {
+    btn.disabled = true;
+    btn.style.animation = 'spin 0.8s linear infinite';
+  }
   try {
     await Promise.all([
       loadEmployees(),
@@ -645,15 +651,21 @@ async function refreshAll() {
       loadOvertimeRequests(),
       loadSalaryData(),
     ]);
-    renderOverview();
-    renderEmployeeList();
-    renderOvertimeTab();
-    renderSalaryTab();
+    // Re-render trang đang xem
+    const activePage = document.querySelector('.page.active')?.id?.replace('page-','');
+    if (activePage === 'overview') renderOverview();
+    else if (activePage === 'staff') { renderEmployeeList(); renderOvertimeTab(); renderSalaryTab(); }
+    else if (activePage === 'diary') loadBossDiary();
+    else if (activePage === 'notifications') { loadLeaveRequests(); loadNotifications(); loadAttendanceReports(); }
     updateNotifBadge();
-    showToast('✅ Đã cập nhật dữ liệu', 'success');
+    showToast('✅ Đã cập nhật dữ liệu mới nhất', 'success');
   } catch(err) {
-    showToast('❌ Lỗi: ' + err.message, 'error');
-    alert('DEBUG LỖI: ' + err.message + '\n' + err.stack);
+    showToast('❌ Lỗi refresh: ' + err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.style.animation = '';
+    }
   }
 }
 
