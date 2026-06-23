@@ -899,10 +899,10 @@ function calcBonus() {
 
 // ─── CHECK-IN / CHECK-OUT ──────────────────────────────
 async function doShiftAction(shift) {
-  const btnId = shift === 'morning' ? 'morningBtn' : 'afternoonBtn';
+  const btnId = shift === 'morning' ? 'morningBtn' : shift === 'afternoon' ? 'afternoonBtn' : 'eveningBtn';
   const btn = document.getElementById(btnId);
   const d = state.todayData;
-  const isCheckin = shift === 'morning' ? !d.morningCheckin : !d.afternoonCheckin;
+  const isCheckin = shift === 'morning' ? !d.morningCheckin : shift === 'afternoon' ? !d.afternoonCheckin : !d.eveningCheckin;
 
   btn.disabled = true;
   const isSunday = new Date().getDay() === 0;
@@ -1265,6 +1265,8 @@ async function submitSupply() {
   const onBehalfEmpId = onBehalf ? document.getElementById('onBehalfEmp').value : null;
   if (onBehalf && !onBehalfEmpId) { showToast('Vui lòng chọn đồng nghiệp được đại diện!', 'danger'); return; }
 
+  showSentFeedback(document.querySelector('button[onclick="submitSupply()"]'));
+
   localStorage.setItem(`supply_${today()}`, JSON.stringify(data));
   localStorage.setItem(`supplyChecked_${today()}`, '1');
 
@@ -1325,6 +1327,7 @@ async function submitReturnCustomer() {
     uploadIfExists(f3, `Mã QR khách - ĐH ${orderId}`),
   ]);
 
+  showSentFeedback(document.querySelector('button[onclick="submitReturnCustomer()"]'));
   await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'customer',
     orderId, amount, bankInfo, condition, photoShipper: urlShipper, photoActual: urlActual, photoQR: urlQR });
   showToast('✅ Đã ghi nhận! Boss sẽ xem xét và hoàn tiền cho khách.', 'success');
@@ -1358,6 +1361,7 @@ async function submitReturnCarrier() {
     uploadCarrierPhoto(f2, `Ảnh Pancake ${today()}`),
   ]);
 
+  showSentFeedback(document.querySelector('button[onclick="submitReturnCarrier()"]'));
   await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'carrier',
     count, orderIds, photoOrders: urlOrders, photoPancake: urlPancake });
   showToast('✅ Đã ghi nhận hàng vận chuyển hoàn về!', 'success');
@@ -2075,6 +2079,22 @@ async function changePassword() {
   }, 1800);
 }
 
+// Hiển thị "Đã Gửi / Chờ Xác Nhận" trên nút trong 5 giây rồi khôi phục
+function showSentFeedback(btn, originalText) {
+  if (!btn) return;
+  const orig = originalText || btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '✅ Đã Gửi / Chờ Xác Nhận';
+  btn.style.background = 'var(--success)';
+  btn.style.color = 'white';
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    btn.style.background = '';
+    btn.style.color = '';
+  }, 5000);
+}
+
 function showToast(msg, type = 'success') {
   const el = document.createElement('div');
   el.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
@@ -2264,16 +2284,15 @@ async function submitLeaveRequest() {
     photoUrl = document.getElementById('leavePhotoImg').src; // base64 preview
   }
 
-  const btn = document.querySelector('#page-leave .btn-primary');
-  btn.disabled = true; btn.textContent = '⏳ Đang gửi...';
+  const btn = document.querySelector('button[onclick="submitLeaveRequest()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang gửi...'; }
 
   const res = await apiCall('submitLeaveRequest', {
     empId: state.user.id, date, shift: _leaveShift, reason, photoUrl
   });
 
-  btn.disabled = false; btn.innerHTML = '📤 Gửi Đơn Xin Nghỉ';
-
   if (res.ok) {
+    showSentFeedback(btn);
     showToast('✅ Đã gửi đơn! Chờ chị duyệt.', 'success');
     document.getElementById('leaveReason').value = '';
     clearLeavePhoto();
@@ -2284,6 +2303,7 @@ async function submitLeaveRequest() {
     });
     loadLeaveHistory();
   } else {
+    if (btn) { btn.disabled = false; btn.innerHTML = '📤 Gửi Đơn Xin Nghỉ'; }
     showToast('Gửi thất bại, thử lại nhé', 'error');
   }
 }
@@ -2351,16 +2371,15 @@ async function submitLeaveRequest2() {
   if (!_leaveShift2) { showToast('Vui lòng chọn ca nghỉ', 'error'); return; }
   if (!reason)       { showToast('Vui lòng ghi rõ lý do', 'error'); return; }
 
-  const btn = document.getElementById('empSchedTab-leave').querySelector('.btn-primary');
-  btn.disabled = true; btn.textContent = '⏳ Đang gửi...';
+  const btn = document.querySelector('button[onclick="submitLeaveRequest2()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang gửi...'; }
 
   const res = await apiCall('submitLeaveRequest', {
     empId: state.user.id, date, shift: _leaveShift2, reason, photoUrl: ''
   });
 
-  btn.disabled = false; btn.innerHTML = '📤 Gửi Đơn Xin Nghỉ';
-
   if (res.ok) {
+    showSentFeedback(btn);
     showToast('✅ Đã gửi đơn! Chờ chị duyệt.', 'success');
     document.getElementById('leaveReason2').value = '';
     _leaveShift2 = '';
@@ -2370,6 +2389,7 @@ async function submitLeaveRequest2() {
     });
     loadLeaveHistory2();
   } else {
+    if (btn) { btn.disabled = false; btn.innerHTML = '📤 Gửi Đơn Xin Nghỉ'; }
     showToast('Gửi thất bại, thử lại nhé', 'error');
   }
 }
