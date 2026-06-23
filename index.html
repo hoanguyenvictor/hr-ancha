@@ -1686,7 +1686,8 @@ async function loadBossDiary() {
       const afternoon = ci.find(r => r.shift === 'afternoon');
       const evening   = ci.find(r => r.shift === 'evening');
 
-      const sub  = subs.find(r => String(r.empId) === String(emp.id) && r.date === date);
+      const subAll = subs.filter(r => String(r.empId) === String(emp.id) && r.date === date);
+      const sub  = subAll.length ? subAll[subAll.length - 1] : null; // lấy lần gửi cuối cùng
       const sup  = supplies.find(r => String(r.empId) === String(emp.id) && r.date === date);
       const rets = returns_.filter(r => String(r.empId) === String(emp.id) && r.date === date);
 

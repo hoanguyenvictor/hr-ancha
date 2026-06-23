@@ -549,6 +549,7 @@ function handleCheckin(data) {
 function handleCheckout(data) {
   const { empId, date, time, shift, early, earlyMin } = data;
   const shiftKey = shift || 'morning';
+  const tz = Session.getScriptTimeZone();
   // Cập nhật đúng dòng theo ca
   const sheet = getSheet(SHEETS.CHECKIN);
   const vals = sheet.getDataRange().getValues();
@@ -558,8 +559,11 @@ function handleCheckout(data) {
   const dateIdx = headers.indexOf('date');
   let found = false;
   for (let i = 1; i < vals.length; i++) {
-    const rowShift = shiftIdx >= 0 ? (vals[i][shiftIdx] || 'morning') : 'morning';
-    if (String(vals[i][empIdx]) === String(empId) && String(vals[i][dateIdx]) === String(date) && rowShift === shiftKey) {
+    // Xử lý date: Sheets có thể tự convert string → Date object
+    let rowDate = vals[i][dateIdx];
+    if (rowDate instanceof Date) rowDate = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+    const rowShift = shiftIdx >= 0 ? (String(vals[i][shiftIdx] || '') || 'morning') : 'morning';
+    if (String(vals[i][empIdx]) === String(empId) && String(rowDate) === String(date) && rowShift === shiftKey) {
       const coIdx = headers.indexOf('checkoutTime');
       const earlyIdx = headers.indexOf('early');
       const earlyMinIdx = headers.indexOf('earlyMin');
