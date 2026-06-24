@@ -904,6 +904,14 @@ async function doShiftAction(shift) {
   const d = state.todayData;
   const isCheckin = shift === 'morning' ? !d.morningCheckin : shift === 'afternoon' ? !d.afternoonCheckin : !d.eveningCheckin;
 
+  // Kiểm tra giờ hợp lệ cho từng ca (chỉ áp dụng khi check-in)
+  if (isCheckin) {
+    const h = new Date().getHours();
+    if (shift === 'morning'   && (h < 6  || h >= 13)) { showToast('⏰ Ca sáng chỉ check-in từ 6:00 – 13:00', 'warning'); return; }
+    if (shift === 'afternoon' && (h < 12 || h >= 19)) { showToast('⏰ Ca chiều chỉ check-in từ 12:00 – 19:00', 'warning'); return; }
+    if (shift === 'evening'   && (h < 18))             { showToast('⏰ Ca tối chỉ check-in từ 18:00 trở đi', 'warning'); return; }
+  }
+
   btn.disabled = true;
   const isSunday = new Date().getDay() === 0;
   const isOnline = isSunday || shift === 'evening';
@@ -961,8 +969,8 @@ async function doShiftAction(shift) {
         const shiftNameVN = shift === 'morning' ? 'ca sáng' : 'ca chiều';
         await apiCall('addDeduction', { empId: state.user.id, date: today(), reason: `Đi muộn ${shiftNameVN} ${diffMin} phút`, amount: 50000 });
       }
-      if (shift === 'morning') { d.morningCheckin = timeStr; d.morningLate = late; }
-      else if (shift === 'afternoon') { d.afternoonCheckin = timeStr; d.afternoonLate = late; }
+      if (shift === 'morning') { d.morningCheckin = timeStr; d.morningLate = late; d.checkin = timeStr; }
+      else if (shift === 'afternoon') { d.afternoonCheckin = timeStr; d.afternoonLate = late; if (!d.checkin) d.checkin = timeStr; }
       else { d.eveningCheckin = timeStr; }
       const prefix = isOnline ? '🏠 Online · ' : '';
       const shiftLabel = shift === 'morning' ? 'sáng' : shift === 'afternoon' ? 'chiều' : 'tối';
