@@ -1898,7 +1898,11 @@ async function confirmReturn(id, empId, isCustomer) {
     }
   }
   const res = await apiCall('confirmReturn', { id, empId, approved: true, proofUrl });
-  if (res.ok) { showToast('✅ Đã xác nhận — nhân viên sẽ nhận thông báo!', 'success'); loadNotifications(); }
+  if (res.ok) {
+    const msg = isCustomer ? '✅ Hoàn tiền cho khách thành công!' : '✅ Đã xác nhận hoàn — nhập kho OK!';
+    showToast(msg, 'success');
+    loadNotifications();
+  }
 }
 
 async function rejectReturn(id, empId) {
