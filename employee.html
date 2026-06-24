@@ -957,15 +957,17 @@ async function doShiftAction(shift) {
     }
     const timeStr = nowTime();
     if (isCheckin) {
-      // Tính trễ
-      const startStr = shift === 'morning' ? DB_CONFIG.MORNING_START : DB_CONFIG.AFTERNOON_START;
+      // Tính trễ — ca tối dùng giờ đăng ký từ lịch, fallback DB_CONFIG.EVENING_START
+      const eveningStart = state.todayData.eveningStart || DB_CONFIG.EVENING_START || '19:30';
+      const startStr = shift === 'morning' ? DB_CONFIG.MORNING_START : shift === 'afternoon' ? DB_CONFIG.AFTERNOON_START : eveningStart;
       const [sh, sm] = startStr.split(':').map(Number);
       const [ch, cm] = timeStr.split(':').map(Number);
       const diffMin = (ch*60+cm) - (sh*60+sm);
-      const late = diffMin > DB_CONFIG.LATE_GRACE_MINUTES;
+      // Ca tối không phạt trễ (online, linh hoạt giờ)
+      const late = shift !== 'evening' && diffMin > DB_CONFIG.LATE_GRACE_MINUTES;
       await apiCall('checkin', { empId: state.user.id, date: today(), time: timeStr, shift,
         lat: gps.lat, lng: gps.lng, late, lateMin: Math.max(0, diffMin), remote: isOnline });
-      // Ghi phạt ngay khi check-in muộn (không chờ 23:30)
+      // Ghi phạt ngay khi check-in muộn (chỉ ca sáng và chiều)
       if (late) {
         const shiftNameVN = shift === 'morning' ? 'ca sáng' : 'ca chiều';
         await apiCall('addDeduction', { empId: state.user.id, date: today(), reason: `Đi muộn ${shiftNameVN} ${diffMin} phút`, amount: 50000 });
