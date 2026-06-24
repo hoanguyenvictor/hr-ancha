@@ -1793,6 +1793,16 @@ async function loadNotifications() {
   el.innerHTML = checklistHTML + returnsHTML;
 }
 
+async function reviewEarlyOut(rowIndex, empId, date, shift, earlyMin, approved, btn) {
+  btn.disabled = true;
+  btn.textContent = '⏳...';
+  const res = await apiCall('reviewEarlyCheckout', { rowIndex, empId, date, shift, earlyMin, approved });
+  if (res.ok) {
+    showToast(approved ? '✅ Đã miễn phạt về sớm' : '❌ Đã phạt 50.000đ', approved ? 'success' : 'error');
+    loadAttendanceReports();
+  }
+}
+
 async function loadAttendanceReports() {
   const el = document.getElementById('attendanceReportList');
   if (!el) return;
@@ -1803,8 +1813,25 @@ async function loadAttendanceReports() {
     return;
   }
   el.innerHTML = res.data.map(n => {
-    const isGood = n.message.startsWith('✅');
     const isUnread = n.read === 'false' || n.read === false;
+
+    // Thẻ về sớm — boss cần duyệt
+    if (n.type === 'early_checkout' && isUnread) {
+      let info = {};
+      try { info = JSON.parse(n.message); } catch(e) {}
+      const shiftVN = info.shift === 'morning' ? 'ca sáng' : info.shift === 'afternoon' ? 'ca chiều' : 'ca tối';
+      return `<div style="padding:12px;border-radius:10px;margin-bottom:8px;background:#fef9c3;border-left:3px solid #f59e0b">
+        <div style="font-size:0.75rem;color:var(--muted);margin-bottom:4px">${n.date} · ⏰ VỀ SỚM</div>
+        <div style="font-size:0.85rem;font-weight:700">👤 ${info.empName || info.empId}</div>
+        <div style="font-size:0.82rem;margin-top:4px">🏁 Checkout ${shiftVN} lúc ${info.time} — sớm <b>${info.earlyMin} phút</b></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button onclick="reviewEarlyOut(${n._row},'${info.empId}','${n.date}','${info.shift}',${info.earlyMin},true,this)" style="flex:1;padding:8px;background:#10b981;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">✅ Miễn phạt</button>
+          <button onclick="reviewEarlyOut(${n._row},'${info.empId}','${n.date}','${info.shift}',${info.earlyMin},false,this)" style="flex:1;padding:8px;background:#ef4444;color:white;border:none;border-radius:8px;font-weight:700;cursor:pointer">❌ Phạt 50k</button>
+        </div>
+      </div>`;
+    }
+
+    const isGood = n.message.startsWith('✅');
     return `<div style="padding:12px;border-radius:10px;margin-bottom:8px;background:${isUnread ? 'rgba(99,102,241,0.08)' : 'rgba(0,0,0,0.03)'};border-left:3px solid ${isGood ? '#10b981' : '#f59e0b'}">
       <div style="font-size:0.75rem;color:var(--muted);margin-bottom:4px">${n.date}</div>
       <div style="font-size:0.83rem;white-space:pre-line;line-height:1.5">${n.message}</div>

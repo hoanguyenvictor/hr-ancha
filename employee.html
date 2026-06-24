@@ -904,12 +904,13 @@ async function doShiftAction(shift) {
   const d = state.todayData;
   const isCheckin = shift === 'morning' ? !d.morningCheckin : shift === 'afternoon' ? !d.afternoonCheckin : !d.eveningCheckin;
 
-  // Kiểm tra giờ hợp lệ cho từng ca (chỉ áp dụng khi check-in)
+  // Kiểm tra giờ hợp lệ cho từng ca
+  const nowH = new Date().getHours(), nowM = new Date().getMinutes();
+  const nowTotal = nowH * 60 + nowM;
   if (isCheckin) {
-    const h = new Date().getHours();
-    if (shift === 'morning'   && (h < 6  || h >= 13)) { showToast('⏰ Ca sáng chỉ check-in từ 6:00 – 13:00', 'warning'); return; }
-    if (shift === 'afternoon' && (h < 12 || h >= 19)) { showToast('⏰ Ca chiều chỉ check-in từ 12:00 – 19:00', 'warning'); return; }
-    if (shift === 'evening'   && (h < 18))             { showToast('⏰ Ca tối chỉ check-in từ 18:00 trở đi', 'warning'); return; }
+    if (shift === 'morning'   && (nowTotal < 7*60+30 || nowTotal >= 12*60))  { showToast('⏰ Ca sáng chỉ check-in từ 7:30 – 12:00', 'warning'); return; }
+    if (shift === 'afternoon' && (nowTotal < 12*60+30 || nowTotal >= 18*60)) { showToast('⏰ Ca chiều chỉ check-in từ 12:30 – 18:00', 'warning'); return; }
+    if (shift === 'evening'   && nowTotal < 19*60)                           { showToast('⏰ Ca tối chỉ check-in từ 19:00 trở đi', 'warning'); return; }
   }
 
   btn.disabled = true;
@@ -976,22 +977,27 @@ async function doShiftAction(shift) {
       const shiftLabel = shift === 'morning' ? 'sáng' : shift === 'afternoon' ? 'chiều' : 'tối';
       showToast(late ? `⚠️ ${prefix}Check-in ${shiftLabel} lúc ${timeStr} — trễ ${diffMin} phút · Trừ 50.000đ thưởng` : `✅ ${prefix}Check-in ${shiftLabel} ${timeStr} — Đúng giờ!`, late ? 'warning' : 'success');
     } else {
-      // Check-out
-      const endStr = shift === 'morning' ? DB_CONFIG.MORNING_END : DB_CONFIG.AFTERNOON_END;
+      // Check-out — phát hiện về sớm
+      const endMap = { morning: '12:00', afternoon: '17:30', evening: '22:00' };
+      const endStr = endMap[shift] || '12:00';
       const [eh, em2] = endStr.split(':').map(Number);
       const [ch, cm] = timeStr.split(':').map(Number);
       const earlyMin = (eh*60+em2) - (ch*60+cm);
       const early = earlyMin > DB_CONFIG.LATE_GRACE_MINUTES;
+
+      // Nếu về sớm: cảnh báo rõ ràng nhưng vẫn cho checkout, boss sẽ duyệt
+      if (early) {
+        showToast(`⚠️ Về sớm ${earlyMin} phút — Boss sẽ xem xét có phạt không`, 'warning');
+      }
+
       await apiCall('checkout', { empId: state.user.id, date: today(), time: timeStr, shift,
         lat: gps.lat, lng: gps.lng, early, earlyMin: Math.max(0, earlyMin) });
-      if (shift === 'morning') d.morningCheckout = timeStr;
-      else d.afternoonCheckout = timeStr;
       if (shift === 'morning') d.morningCheckout = timeStr;
       else if (shift === 'afternoon') d.afternoonCheckout = timeStr;
       else d.eveningCheckout = timeStr;
       const outPrefix = isOnline ? '🏠 Online · ' : '';
       const shiftLabelOut = shift === 'morning' ? 'sáng' : shift === 'afternoon' ? 'chiều' : 'tối';
-      showToast(`✅ ${outPrefix}Check-out ${shiftLabelOut} lúc ${timeStr}`, 'success');
+      if (!early) showToast(`✅ ${outPrefix}Check-out ${shiftLabelOut} lúc ${timeStr}`, 'success');
     }
     localStorage.setItem(`todayData_${today()}`, JSON.stringify(d));
     renderHome();

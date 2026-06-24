@@ -275,6 +275,7 @@ function doGet(e) {
       case 'registerSchedule':    result = registerSchedule(data); break;
       case 'getSchedule':         result = getSchedule(data); break;
       case 'getAllSchedule':      result = getAllSchedule(data); break;
+      case 'reviewEarlyCheckout': result = reviewEarlyCheckout(data); break;
       case 'getWeeklySchedule':   result = getWeeklySchedule(data); break;
       case 'approveShiftHours':   result = approveShiftHours(data); break;
       case 'startOTShift':        result = startOTShift(data); break;
@@ -578,7 +579,14 @@ function handleCheckout(data) {
     log('checkout_warn', `Không tìm thấy dòng checkin để cập nhật checkout: empId=${empId} date=${date} shift=${shiftKey}`);
   }
   log('checkout', `${empId} - ${date} ${shiftKey} ${time}${early?' VỀ SỚM '+earlyMin+'p':''}`);
-  if (early) addAutoPenalty(empId, date, `Về sớm ca ${shiftKey === 'morning' ? 'sáng' : 'chiều'}`, `Về sớm ${earlyMin} phút`);
+  // Về sớm → KHÔNG auto phạt, gửi boss duyệt qua BossNotifications
+  if (early) {
+    var ss2 = SpreadsheetApp.getActiveSpreadsheet();
+    var bn = ss2.getSheetByName('BossNotifications');
+    if (!bn) { bn = ss2.insertSheet('BossNotifications'); bn.appendRow(['date','type','message','read']); }
+    var shiftVN2 = shiftKey === 'morning' ? 'ca sáng' : shiftKey === 'afternoon' ? 'ca chiều' : 'ca tối';
+    bn.appendRow([date, 'early_checkout', JSON.stringify({ empId: String(empId), empName: empNameCo, shift: shiftKey, earlyMin: earlyMin, time: time }), 'false']);
+  }
   // Thông báo boss
   const empsCo = sheetData(SHEETS.EMPLOYEES);
   const empCo = empsCo.find(function(e){ return String(e.id) === String(empId); });
@@ -1279,6 +1287,23 @@ function registerSchedule(data) {
 }
 
 // Trả về lịch đăng ký của tất cả nhân viên, dedup lấy lần cuối mỗi ngày
+function reviewEarlyCheckout(data) {
+  var { rowIndex, empId, date, shift, earlyMin, approved } = data;
+  // Đánh dấu đã đọc notification
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var bn = ss.getSheetByName('BossNotifications');
+  if (bn && rowIndex) {
+    var readCol = bn.getRange(1,1,1,bn.getLastColumn()).getValues()[0].indexOf('read');
+    if (readCol >= 0) bn.getRange(rowIndex, readCol+1).setValue('true');
+  }
+  // Nếu boss phạt → thêm deduction
+  if (!approved) {
+    var shiftVN = shift === 'morning' ? 'ca sáng' : shift === 'afternoon' ? 'ca chiều' : 'ca tối';
+    addAutoPenalty(empId, date, 'Về sớm ' + shiftVN, 'Về sớm ' + earlyMin + ' phút — Boss không duyệt');
+  }
+  return { ok: true };
+}
+
 function getAllSchedule(data) {
   const { from, to } = data || {};
   var all = sheetData(SHEETS.SCHEDULE);
