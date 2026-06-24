@@ -210,9 +210,9 @@
           <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">Chụp thực tế hàng nhận về</div>
           <img id="r1_photoActualPreview" class="upload-preview hidden">
         </div>
-        <input type="file" id="r1_photoActual" accept="image/*" capture="environment" class="hidden" onchange="previewPhoto(this,'r1_photoActualPreview')">
+        <input type="file" id="r1_photoActual" accept="image/*" class="hidden" onchange="previewPhoto(this,'r1_photoActualPreview')">
       </div>
-      <button class="btn btn-warning" onclick="submitReturnCustomer()">📥 Ghi Nhận & Gửi Boss</button>
+      <button class="btn btn-warning" id="btnReturnCustomerSubmit" onclick="confirmReturnSubmit('customer')">📥 Ghi Nhận & Gửi Boss</button>
     </div>
     <div id="returnFormCarrier" style="display:none">
       <div class="form-group"><label>Số đơn hoàn hôm nay</label><input type="number" id="r2_count" placeholder="VD: 5" min="1"></div>
@@ -224,7 +224,7 @@
           <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">Chụp ảnh toàn bộ đơn hoàn</div>
           <img id="r2_photoOrdersPreview" class="upload-preview hidden">
         </div>
-        <input type="file" id="r2_photoOrders" accept="image/*" capture="environment" class="hidden" onchange="previewPhoto(this,'r2_photoOrdersPreview')">
+        <input type="file" id="r2_photoOrders" accept="image/*" class="hidden" onchange="previewPhoto(this,'r2_photoOrdersPreview')">
       </div>
       <div class="form-group">
         <label>📷 Ảnh đã kiểm kho trên Pancake</label>
@@ -233,9 +233,9 @@
           <div style="font-size:0.82rem;color:var(--muted);margin-top:4px">Chụp màn hình Pancake đã cập nhật</div>
           <img id="r2_photoPancakePreview" class="upload-preview hidden">
         </div>
-        <input type="file" id="r2_photoPancake" accept="image/*" class="hidden" onchange="previewPhoto(this,'r2_photoPancakePreview')">
+        <input type="file" id="r2_photoPancake" accept="image/*" multiple class="hidden" onchange="previewMultiPhoto(this,'r2_photoPancakePreview')">
       </div>
-      <button class="btn btn-warning" onclick="submitReturnCarrier()">📥 Ghi Nhận & Gửi Boss</button>
+      <button class="btn btn-warning" id="btnReturnCarrierSubmit" onclick="confirmReturnSubmit('carrier')">📥 Ghi Nhận & Gửi Boss</button>
     </div>
   </div>
   </div><!-- end checklistTab-return -->
@@ -1182,10 +1182,7 @@ async function submitChecklist() {
   await Promise.all(doneTasks.map(t =>
     apiCall('updateChecklist', { empId: state.user.id, date: today(), taskId: t.id, done: true, doneTime })
   ));
-  const undoneTasks = allTasks.filter(t => !state.checklistState[t.id]);
-  await Promise.all(undoneTasks.map(t =>
-    apiCall('updateChecklist', { empId: state.user.id, date: today(), taskId: t.id, done: false, doneTime: null })
-  ));
+  // Không gửi done:false cho task chưa tick — giữ nguyên kết quả buổi trước
 
   state.todayData.checklist = state.checklistState;
   state.todayData.checklistSubmitted = today();
@@ -1318,6 +1315,35 @@ function switchReturnType(type) {
   btnK.style.borderColor = type === 'carrier' ? 'var(--primary)' : 'var(--muted)';
 }
 
+let _returnConfirmPending = null;
+function confirmReturnSubmit(type) {
+  const btnId = type === 'customer' ? 'btnReturnCustomerSubmit' : 'btnReturnCarrierSubmit';
+  const btn = document.getElementById(btnId);
+  if (_returnConfirmPending !== type) {
+    // Lần 1: chuyển sang trạng thái xác nhận
+    _returnConfirmPending = type;
+    btn.textContent = '⚠️ Xác nhận gửi Boss?';
+    btn.style.background = '#ef4444';
+    btn.style.color = 'white';
+    setTimeout(() => {
+      if (_returnConfirmPending === type) {
+        _returnConfirmPending = null;
+        btn.textContent = '📥 Ghi Nhận & Gửi Boss';
+        btn.style.background = '';
+        btn.style.color = '';
+      }
+    }, 4000);
+  } else {
+    // Lần 2: thật sự gửi
+    _returnConfirmPending = null;
+    btn.textContent = '📥 Ghi Nhận & Gửi Boss';
+    btn.style.background = '';
+    btn.style.color = '';
+    if (type === 'customer') submitReturnCustomer();
+    else submitReturnCarrier();
+  }
+}
+
 async function submitReturnCustomer() {
   const orderId = document.getElementById('r1_orderId').value.trim();
   const amount = document.getElementById('r1_amount').value.trim();
@@ -1362,7 +1388,7 @@ async function submitReturnCarrier() {
   if (!count || !orderIds) { showToast('Vui lòng nhập đầy đủ thông tin!', 'danger'); return; }
 
   const f1 = document.getElementById('r2_photoOrders').files[0];
-  const f2 = document.getElementById('r2_photoPancake').files[0];
+  const pancakeFiles = Array.from(document.getElementById('r2_photoPancake').files);
   showToast('⏳ Đang tải ảnh lên...', 'info');
 
   async function uploadCarrierPhoto(file, label) {
@@ -1370,10 +1396,11 @@ async function submitReturnCarrier() {
     return uploadViaChunks(file, 'return_carrier', label);
   }
 
-  const [urlOrders, urlPancake] = await Promise.all([
+  const [urlOrders, ...urlsPancake] = await Promise.all([
     uploadCarrierPhoto(f1, `Ảnh đơn hoàn VC ${today()}`),
-    uploadCarrierPhoto(f2, `Ảnh Pancake ${today()}`),
+    ...pancakeFiles.map((f, i) => uploadCarrierPhoto(f, `Ảnh Pancake ${today()} (${i+1})`)),
   ]);
+  const urlPancake = urlsPancake.filter(Boolean).join(',');
 
   showSentFeedback(document.querySelector('button[onclick="submitReturnCarrier()"]'));
   await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'carrier',
@@ -1382,10 +1409,9 @@ async function submitReturnCarrier() {
   ['r2_count','r2_orderIds','r2_photoOrders','r2_photoPancake'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
-  ['r2_photoOrdersPreview','r2_photoPancakePreview'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.src = ''; el.classList.add('hidden'); }
-  });
+  document.querySelectorAll('.multi-preview-img').forEach(el => el.remove());
+  const op = document.getElementById('r2_photoOrdersPreview');
+  if (op) { op.src = ''; op.classList.add('hidden'); }
 }
 
 // ─── EVENING SHIFT ─────────────────────────────────────
@@ -2129,6 +2155,25 @@ function previewQRPhoto(input) {
       `<img src="${e.target.result}" style="max-width:100%;max-height:180px;border-radius:8px;object-fit:contain">`;
   };
   reader.readAsDataURL(file);
+}
+
+function previewMultiPhoto(input, previewId) {
+  const container = document.getElementById(previewId)?.parentElement;
+  if (!container) return;
+  // Xóa preview cũ
+  const old = container.querySelectorAll('.multi-preview-img');
+  old.forEach(el => el.remove());
+  Array.from(input.files).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.className = 'multi-preview-img';
+      img.style.cssText = 'width:80px;height:80px;object-fit:cover;border-radius:8px;margin:4px';
+      container.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
 }
 
 function previewPhoto(input, previewId) {
