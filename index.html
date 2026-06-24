@@ -743,17 +743,6 @@ function renderOverview() {
   });
   document.getElementById('statTasksDone').textContent = `${doneTasks}/${totalTasks}`;
 
-  // Employee list
-  const empList = document.getElementById('empList');
-  if (!employees.length) {
-    empList.innerHTML = `<div style="text-align:center;padding:20px;color:var(--muted)">
-      <div style="font-size:2rem;margin-bottom:8px">👥</div>
-      Chưa có nhân viên — <a onclick="switchPage('employees')" style="color:var(--primary);cursor:pointer">Thêm ngay</a>
-    </div>`;
-    return;
-  }
-  empList.innerHTML = employees.map(e => empRowHTML(e)).join('');
-
   // Supply overview
   renderSupplyOverview();
 }
