@@ -441,6 +441,40 @@ function resetTodayData() {
   Object.keys(deleted).forEach(function(k) { Logger.log('  ' + k + ': ' + deleted[k]); });
 }
 
+// Chạy thủ công từ Apps Script editor để reset data ngày 2026-06-24
+function resetDate_20260624() {
+  resetSpecificDate('2026-06-24');
+}
+
+function resetSpecificDate(targetDate) {
+  var tz = Session.getScriptTimeZone();
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var deleted = {};
+
+  // Xóa Checkin, Checklist, Submissions, Deductions cho ngày đó
+  ['Checkin', 'Checklist', 'Submissions', 'Deductions'].forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) { deleted[name] = 'không tìm thấy'; return; }
+    var vals = sheet.getDataRange().getValues();
+    var headers = vals[0];
+    var dateIdx = headers.indexOf('date');
+    if (dateIdx < 0) { deleted[name] = 'không có cột date'; return; }
+    var count = 0;
+    for (var i = vals.length - 1; i >= 1; i--) {
+      var rowDate = vals[i][dateIdx];
+      if (rowDate instanceof Date) rowDate = Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd');
+      if (String(rowDate) === targetDate) {
+        sheet.deleteRow(i + 1);
+        count++;
+      }
+    }
+    deleted[name] = 'đã xóa ' + count + ' dòng';
+  });
+
+  Logger.log('✅ Reset ngày ' + targetDate + ' hoàn tất:');
+  Object.keys(deleted).forEach(function(k) { Logger.log('  ' + k + ': ' + deleted[k]); });
+}
+
 function migrateCheckinSheet() {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Checkin');
   if (!sheet) { Logger.log('Không tìm thấy sheet Checkin'); return; }
