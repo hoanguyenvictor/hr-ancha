@@ -446,6 +446,11 @@ function resetDate_20260624() {
   resetSpecificDate('2026-06-24');
 }
 
+// Chạy thủ công từ Apps Script editor để reset data ngày 2026-06-25
+function resetDate_20260625() {
+  resetSpecificDate('2026-06-25');
+}
+
 function resetSpecificDate(targetDate) {
   var tz = Session.getScriptTimeZone();
   var ss = SpreadsheetApp.getActiveSpreadsheet();
