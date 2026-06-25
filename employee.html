@@ -1227,9 +1227,12 @@ function renderChecklistSubmitAreas() {
       const rh = Math.floor(remaining / 60), rm = remaining % 60;
       aArea.innerHTML = `<div style="text-align:center;padding:10px;background:#f3f4f6;border-radius:10px;color:var(--muted);font-size:0.85rem">
         🕓 Checklist chiều mở lúc 16:00 (còn ${rh > 0 ? rh + 'h ' : ''}${rm}p)</div>`;
+    } else if (nowTotal >= 18 * 60) {
+      aArea.innerHTML = `<div style="text-align:center;padding:10px;background:#fff3e0;border-radius:10px;color:#e65100;font-weight:700;font-size:0.88rem">
+        ⏰ Đã qua 18:00 — Không còn gửi được ca chiều</div>`;
     } else {
       aArea.innerHTML = `<button class="btn btn-primary" id="btnAfternoonSubmit" onclick="submitShiftChecklist('afternoon')"
-        style="width:100%;background:#6366f1">✅ Gửi Boss ca chiều (từ 16:00)</button>`;
+        style="width:100%;background:#6366f1">✅ Gửi Boss ca chiều (16:00 – 18:00)</button>`;
     }
   }
 }
