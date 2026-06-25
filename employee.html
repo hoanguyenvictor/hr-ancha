@@ -123,12 +123,14 @@
   <!-- Tab: Checklist -->
   <div id="checklistTab-tasks">
     <div class="card">
-      <div class="card-title"><span class="icon">🌅</span>Buổi Sáng</div>
+      <div class="card-title"><span class="icon">🌅</span>Buổi Sáng <span id="morningDeadlineBadge" style="font-size:0.7rem;font-weight:600;color:var(--muted);margin-left:4px">· gửi trước 10:00</span></div>
       <div id="morningList"></div>
+      <div id="morningSubmitArea" style="margin-top:8px"></div>
     </div>
     <div class="card">
-      <div class="card-title"><span class="icon">🌆</span>Buổi Chiều</div>
+      <div class="card-title"><span class="icon">🌆</span>Buổi Chiều <span id="afternoonDeadlineBadge" style="font-size:0.7rem;font-weight:600;color:var(--muted);margin-left:4px">· gửi từ 16:00</span></div>
       <div id="afternoonList"></div>
+      <div id="afternoonSubmitArea" style="margin-top:8px"></div>
     </div>
     <div class="card">
       <div class="card-title"><span class="icon">📋</span>Nhiệm Vụ Phát Sinh</div>
@@ -136,7 +138,6 @@
         <p style="font-size:0.85rem;color:var(--muted)">Chưa có nhiệm vụ phát sinh hôm nay</p>
       </div>
     </div>
-    <button class="btn btn-primary" onclick="submitChecklist()" style="width:100%;margin-top:4px">✅ Xác nhận gửi Boss</button>
   </div>
 
   <!-- Tab: Kiểm Kho -->
@@ -721,9 +722,14 @@ async function loadTodayData() {
   try {
     const res = await apiCall('getTodayData', { empId: state.user.id, date: today() });
     if (res.ok && res.data) {
+      // Giữ lại submitted flags từ localStorage (server không lưu các field này)
+      const morningSubmitted = cached?.checklistMorningSubmitted;
+      const afternoonSubmitted = cached?.checklistAfternoonSubmitted;
       state.todayData = res.data;
+      if (morningSubmitted) state.todayData.checklistMorningSubmitted = morningSubmitted;
+      if (afternoonSubmitted) state.todayData.checklistAfternoonSubmitted = afternoonSubmitted;
       state.checklistState = res.data.checklist || {};
-      localStorage.setItem(`todayData_${today()}`, JSON.stringify(res.data));
+      localStorage.setItem(`todayData_${today()}`, JSON.stringify(state.todayData));
     }
   } catch(e) {}
 }
@@ -1107,8 +1113,9 @@ async function doCheckout() {
 
 // ─── CHECKLIST ─────────────────────────────────────────
 function renderChecklist() {
-  document.getElementById('morningList').innerHTML = MORNING_TASKS.map(t => taskHTML(t)).join('');
-  document.getElementById('afternoonList').innerHTML = AFTERNOON_TASKS.map(t => taskHTML(t)).join('');
+  document.getElementById('morningList').innerHTML = MORNING_TASKS.map(t => taskHTML(t, 'morning')).join('');
+  document.getElementById('afternoonList').innerHTML = AFTERNOON_TASKS.map(t => taskHTML(t, 'afternoon')).join('');
+  renderChecklistSubmitAreas();
   loadAssignedTasks();
 }
 
@@ -1150,18 +1157,34 @@ async function completeAdhocTask(taskId) {
   }
 }
 
-function taskHTML(t) {
+function isShiftLocked(shift) {
+  if (shift === 'morning') return state.todayData?.checklistMorningSubmitted === today();
+  if (shift === 'afternoon') return state.todayData?.checklistAfternoonSubmitted === today();
+  return false;
+}
+
+function getTaskShift(id) {
+  return MORNING_TASKS.some(t => t.id === id) ? 'morning' : 'afternoon';
+}
+
+function taskHTML(t, shift) {
   const done = !!state.checklistState[t.id];
-  return `<div class="checklist-item ${done?'done':''}" id="task_${t.id}" onclick="toggleTask('${t.id}')">
+  const locked = isShiftLocked(shift);
+  return `<div class="checklist-item ${done?'done':''} ${locked?'locked':''}" id="task_${t.id}"
+    onclick="${locked ? '' : `toggleTask('${t.id}')`}"
+    style="${locked ? 'pointer-events:none;opacity:0.7' : 'cursor:pointer'}">
     <div class="check-circle">${done?'✓':''}</div>
     <div style="flex:1">
       <div class="task-name">${t.name}</div>
       <div class="task-meta">${t.detail}</div>
     </div>
+    ${locked ? '<div style="font-size:0.7rem;color:var(--muted)">🔒</div>' : ''}
   </div>`;
 }
 
 function toggleTask(id) {
+  const shift = getTaskShift(id);
+  if (isShiftLocked(shift)) return;
   state.checklistState[id] = !state.checklistState[id];
   const el = document.getElementById(`task_${id}`);
   if (el) {
@@ -1171,50 +1194,79 @@ function toggleTask(id) {
   renderHome();
 }
 
-async function submitChecklist() {
-  const allTasks = [...MORNING_TASKS, ...AFTERNOON_TASKS];
-  const doneTasks = allTasks.filter(t => state.checklistState[t.id]);
+function renderChecklistSubmitAreas() {
+  const nowH = new Date().getHours();
+  const nowM = new Date().getMinutes();
+  const nowTotal = nowH * 60 + nowM;
+
+  // ── SÁNG ──
+  const mArea = document.getElementById('morningSubmitArea');
+  if (mArea) {
+    if (isShiftLocked('morning')) {
+      const done = MORNING_TASKS.filter(t => state.checklistState[t.id]).length;
+      mArea.innerHTML = `<div style="text-align:center;padding:10px;background:#e8f5e9;border-radius:10px;color:#2e7d32;font-weight:700;font-size:0.88rem">
+        ✅ Đã gửi Boss — ${done}/${MORNING_TASKS.length} việc · Đã khoá 🔒</div>`;
+    } else if (nowTotal >= 10 * 60) {
+      mArea.innerHTML = `<div style="text-align:center;padding:10px;background:#fff3e0;border-radius:10px;color:#e65100;font-weight:700;font-size:0.88rem">
+        ⏰ Đã qua 10:00 — Không còn gửi được ca sáng</div>`;
+    } else {
+      mArea.innerHTML = `<button class="btn btn-primary" id="btnMorningSubmit" onclick="submitShiftChecklist('morning')"
+        style="width:100%">✅ Gửi Boss ca sáng (trước 10:00)</button>`;
+    }
+  }
+
+  // ── CHIỀU ──
+  const aArea = document.getElementById('afternoonSubmitArea');
+  if (aArea) {
+    if (isShiftLocked('afternoon')) {
+      const done = AFTERNOON_TASKS.filter(t => state.checklistState[t.id]).length;
+      aArea.innerHTML = `<div style="text-align:center;padding:10px;background:#e8f5e9;border-radius:10px;color:#2e7d32;font-weight:700;font-size:0.88rem">
+        ✅ Đã gửi Boss — ${done}/${AFTERNOON_TASKS.length} việc · Đã khoá 🔒</div>`;
+    } else if (nowTotal < 16 * 60) {
+      const remaining = 16 * 60 - nowTotal;
+      const rh = Math.floor(remaining / 60), rm = remaining % 60;
+      aArea.innerHTML = `<div style="text-align:center;padding:10px;background:#f3f4f6;border-radius:10px;color:var(--muted);font-size:0.85rem">
+        🕓 Checklist chiều mở lúc 16:00 (còn ${rh > 0 ? rh + 'h ' : ''}${rm}p)</div>`;
+    } else {
+      aArea.innerHTML = `<button class="btn btn-primary" id="btnAfternoonSubmit" onclick="submitShiftChecklist('afternoon')"
+        style="width:100%;background:#6366f1">✅ Gửi Boss ca chiều (từ 16:00)</button>`;
+    }
+  }
+}
+
+async function submitShiftChecklist(shift) {
+  const tasks = shift === 'morning' ? MORNING_TASKS : AFTERNOON_TASKS;
+  const doneTasks = tasks.filter(t => state.checklistState[t.id]);
   if (doneTasks.length === 0) { showToast('Chưa tick việc nào!', 'warning'); return; }
 
-  const submitBtn = document.querySelector('#page-checklist .btn-primary');
-  if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = '⏳ Đang gửi...'; }
+  const btnId = shift === 'morning' ? 'btnMorningSubmit' : 'btnAfternoonSubmit';
+  const btn = document.getElementById(btnId);
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang gửi...'; }
 
   const doneTime = nowTime();
   await Promise.all(doneTasks.map(t =>
     apiCall('updateChecklist', { empId: state.user.id, date: today(), taskId: t.id, done: true, doneTime })
   ));
-  // Không gửi done:false cho task chưa tick — giữ nguyên kết quả buổi trước
 
+  const allTasks = [...MORNING_TASKS, ...AFTERNOON_TASKS];
+  const allDone = allTasks.filter(t => state.checklistState[t.id]).length;
   state.todayData.checklist = state.checklistState;
-  state.todayData.checklistSubmitted = today();
+  if (shift === 'morning') state.todayData.checklistMorningSubmitted = today();
+  else state.todayData.checklistAfternoonSubmitted = today();
   localStorage.setItem(`todayData_${today()}`, JSON.stringify(state.todayData));
-  await apiCall('createSubmission', { empId: state.user.id, date: today(), totalTasks: allTasks.length, doneTasks: doneTasks.length });
 
-  // Đổi nút thành "Đã gửi" vĩnh viễn trong ngày
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.textContent = `✅ Đã gửi Boss (${doneTasks.length}/${allTasks.length} việc)`;
-    submitBtn.style.background = 'var(--success)';
-  }
-  showToast(`✅ Đã gửi ${doneTasks.length}/${allTasks.length} việc — chờ Boss xác nhận!`, 'success');
+  await apiCall('createSubmission', { empId: state.user.id, date: today(), shift, totalTasks: tasks.length, doneTasks: doneTasks.length });
+
+  showToast(`✅ Đã gửi ${doneTasks.length}/${tasks.length} việc ${shift==='morning'?'ca sáng':'ca chiều'}!`, 'success');
+  renderChecklist();
   renderHome();
 }
 
+// Legacy — kept for compatibility, redirects to shift-based
+async function submitChecklist() { await submitShiftChecklist('morning'); }
+
 function restoreChecklistBtnState() {
-  const btn = document.querySelector('#page-checklist .btn-primary');
-  if (!btn) return;
-  const allTasks = [...MORNING_TASKS, ...AFTERNOON_TASKS];
-  const submitted = state.todayData?.checklistSubmitted === today();
-  if (submitted) {
-    const done = allTasks.filter(t => state.checklistState[t.id]).length;
-    btn.disabled = true;
-    btn.textContent = `✅ Đã gửi Boss (${done}/${allTasks.length} việc)`;
-    btn.style.background = 'var(--success)';
-  } else {
-    btn.disabled = false;
-    btn.textContent = '✅ Xác nhận gửi Boss';
-    btn.style.background = '';
-  }
+  renderChecklistSubmitAreas();
 }
 
 // ─── SUPPLY ────────────────────────────────────────────
