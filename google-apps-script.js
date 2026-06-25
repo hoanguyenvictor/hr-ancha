@@ -131,7 +131,7 @@ function checkDailyAttendance() {
         addAutoPenalty(emp.id, date, 'Vắng mặt ca sáng', 'Không check-in ca sáng');
         violations.push(`❌ ${emp.name} — Không check-in ca sáng`);
       } else if (!morningRow.checkoutTime) {
-        addAutoPenalty(emp.id, date, 'Thiếu check-out ca sáng', 'Không check-out ca sáng');
+        addAutoPenalty(emp.id, date, 'Không check-out ca sáng', 'Không check-out ca sáng');
         violations.push(`⚠️ ${emp.name} — Không check-out ca sáng`);
       }
     }
@@ -140,7 +140,7 @@ function checkDailyAttendance() {
         addAutoPenalty(emp.id, date, 'Vắng mặt ca chiều', 'Không check-in ca chiều');
         violations.push(`❌ ${emp.name} — Không check-in ca chiều`);
       } else if (!afternoonRow.checkoutTime) {
-        addAutoPenalty(emp.id, date, 'Thiếu check-out ca chiều', 'Không check-out ca chiều');
+        addAutoPenalty(emp.id, date, 'Không check-out ca chiều', 'Không check-out ca chiều');
         violations.push(`⚠️ ${emp.name} — Không check-out ca chiều`);
       }
     }
@@ -579,6 +579,33 @@ function handleCheckout(data) {
     log('checkout_warn', `Không tìm thấy dòng checkin để cập nhật checkout: empId=${empId} date=${date} shift=${shiftKey}`);
   }
   log('checkout', `${empId} - ${date} ${shiftKey} ${time}${early?' VỀ SỚM '+earlyMin+'p':''}`);
+  // Ca tối: cập nhật actualHours và eveningEnd trong SCHEDULE sheet để tính lương tăng ca
+  if (shiftKey === 'evening') {
+    var schedSheet = getSheet(SHEETS.SCHEDULE);
+    var schedVals = schedSheet.getDataRange().getValues();
+    var schedHeaders = schedVals[0];
+    var sEmpIdx = schedHeaders.indexOf('empId');
+    var sDateIdx = schedHeaders.indexOf('date');
+    var sEvEndIdx = schedHeaders.indexOf('eveningEnd');
+    var sActIdx = schedHeaders.indexOf('actualHours');
+    var sEvStartIdx = schedHeaders.indexOf('eveningStart');
+    for (var si = 1; si < schedVals.length; si++) {
+      var sRowDate = schedVals[si][sDateIdx];
+      if (sRowDate instanceof Date) sRowDate = Utilities.formatDate(sRowDate, tz, 'yyyy-MM-dd');
+      if (String(schedVals[si][sEmpIdx]) === String(empId) && String(sRowDate) === String(date) && schedVals[si][sEvStartIdx]) {
+        var evStart = fmtTime(schedVals[si][sEvStartIdx]);
+        if (!evStart) break;
+        var [esh, esm] = evStart.split(':').map(Number);
+        var [ech, ecm] = time.split(':').map(Number);
+        var actualH = Math.round(((ech * 60 + ecm) - (esh * 60 + esm)) / 60 * 10) / 10;
+        if (actualH > 0) {
+          if (sEvEndIdx >= 0) schedSheet.getRange(si + 1, sEvEndIdx + 1).setValue(time);
+          if (sActIdx >= 0) schedSheet.getRange(si + 1, sActIdx + 1).setValue(actualH);
+        }
+        break;
+      }
+    }
+  }
   // Về sớm → KHÔNG auto phạt, gửi boss duyệt qua BossNotifications
   if (early) {
     var ss2 = SpreadsheetApp.getActiveSpreadsheet();
