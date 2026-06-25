@@ -612,7 +612,7 @@ async function initDashboard() {
   document.getElementById('salaryMonth').textContent = monthKey();
   loadSettings();
   await refreshAll();
-  setInterval(autoRefresh, 300000);
+  setInterval(autoRefresh, 120000);
 }
 
 let lastSupplyTime = null;

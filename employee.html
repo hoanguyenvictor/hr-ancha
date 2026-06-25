@@ -1255,7 +1255,9 @@ async function submitShiftChecklist(shift) {
   else state.todayData.checklistAfternoonSubmitted = today();
   localStorage.setItem(`todayData_${today()}`, JSON.stringify(state.todayData));
 
-  await apiCall('createSubmission', { empId: state.user.id, date: today(), shift, totalTasks: tasks.length, doneTasks: doneTasks.length });
+  // Luôn gửi tổng cộng 10 tasks để boss diary hiện đúng X/10
+  const allDoneCount = allTasks.filter(t => state.checklistState[t.id]).length;
+  await apiCall('createSubmission', { empId: state.user.id, date: today(), shift, totalTasks: allTasks.length, doneTasks: allDoneCount });
 
   showToast(`✅ Đã gửi ${doneTasks.length}/${tasks.length} việc ${shift==='morning'?'ca sáng':'ca chiều'}!`, 'success');
   renderChecklist();
@@ -1426,8 +1428,12 @@ async function submitReturnCustomer(btn) {
   ]);
 
   if (btn) btn.textContent = '⏳ Đang gửi Boss...';
-  await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'customer',
+  const custRes = await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'customer',
     orderId, amount, bankInfo, condition, photoShipper: urlShipper, photoActual: urlActual, photoQR: urlQR });
+  if (!custRes.ok) {
+    if (btn) { btn.disabled = false; btn.textContent = '🔁 Gửi lại (lỗi kết nối)'; btn.style.background = '#ef4444'; btn.style.color = 'white'; }
+    showToast('❌ Lỗi kết nối! Ấn nút đỏ để gửi lại.', 'danger'); return;
+  }
   if (btn) { btn.textContent = '✅ Đã Gửi / Chờ Xác Nhận'; btn.style.background = 'var(--success)'; }
   showToast('✅ Đã ghi nhận! Boss sẽ xem xét và hoàn tiền cho khách.', 'success');
   // Reset toàn bộ form khách trả
@@ -1466,8 +1472,12 @@ async function submitReturnCarrier(btn) {
   const urlPancake = urlsPancake.filter(Boolean).join(',');
 
   if (btn) btn.textContent = '⏳ Đang gửi Boss...';
-  await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'carrier',
+  const retRes = await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'carrier',
     count, orderIds, photoOrders: urlOrders, photoPancake: urlPancake });
+  if (!retRes.ok) {
+    if (btn) { btn.disabled = false; btn.textContent = '🔁 Gửi lại (lỗi kết nối)'; btn.style.background = '#ef4444'; btn.style.color = 'white'; }
+    showToast('❌ Lỗi kết nối! Ấn nút đỏ để gửi lại.', 'danger'); return;
+  }
   if (btn) { btn.textContent = '✅ Đã Gửi / Chờ Xác Nhận'; btn.style.background = 'var(--success)'; }
   showToast('✅ Đã ghi nhận hàng vận chuyển hoàn về!', 'success');
   ['r2_count','r2_orderIds','r2_photoOrders','r2_photoPancake'].forEach(id => {
