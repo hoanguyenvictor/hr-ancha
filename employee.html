@@ -1387,27 +1387,32 @@ function confirmReturnSubmit(type) {
       }
     }, 4000);
   } else {
-    // Lần 2: thật sự gửi
+    // Lần 2: thật sự gửi — lock nút ngay và truyền ref xuống
     _returnConfirmPending = null;
-    btn.textContent = '📥 Ghi Nhận & Gửi Boss';
-    btn.style.background = '';
-    btn.style.color = '';
-    if (type === 'customer') submitReturnCustomer();
-    else submitReturnCarrier();
+    btn.disabled = true;
+    btn.textContent = '⏳ Đang gửi...';
+    btn.style.background = '#6b7280';
+    btn.style.color = 'white';
+    if (type === 'customer') submitReturnCustomer(btn);
+    else submitReturnCarrier(btn);
   }
 }
 
-async function submitReturnCustomer() {
+async function submitReturnCustomer(btn) {
   const orderId = document.getElementById('r1_orderId').value.trim();
   const amount = document.getElementById('r1_amount').value.trim();
   const bankInfo = document.getElementById('r1_bankInfo').value.trim();
   const condition = document.getElementById('r1_condition').value;
-  if (!orderId || !amount || !bankInfo) { showToast('Vui lòng nhập đầy đủ thông tin!', 'danger'); return; }
+  if (!orderId || !amount || !bankInfo) {
+    if (btn) { btn.disabled = false; btn.textContent = '📥 Ghi Nhận & Gửi Boss'; btn.style.background = ''; btn.style.color = ''; }
+    showToast('Vui lòng nhập đầy đủ thông tin!', 'danger'); return;
+  }
 
   const f1 = document.getElementById('r1_photoShipper').files[0];
   const f2 = document.getElementById('r1_photoActual').files[0];
   const f3 = document.getElementById('r1_qrPhoto').files[0];
-  showToast('⏳ Đang tải ảnh lên...', 'info');
+  const totalPhotos = [f1,f2,f3].filter(Boolean).length;
+  if (totalPhotos > 0 && btn) btn.textContent = `⏳ Đang tải ${totalPhotos} ảnh...`;
 
   async function uploadIfExists(file, label) {
     if (!file) return null;
@@ -1420,9 +1425,10 @@ async function submitReturnCustomer() {
     uploadIfExists(f3, `Mã QR khách - ĐH ${orderId}`),
   ]);
 
-  showSentFeedback(document.querySelector('button[onclick="submitReturnCustomer()"]'));
+  if (btn) btn.textContent = '⏳ Đang gửi Boss...';
   await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'customer',
     orderId, amount, bankInfo, condition, photoShipper: urlShipper, photoActual: urlActual, photoQR: urlQR });
+  if (btn) { btn.textContent = '✅ Đã Gửi / Chờ Xác Nhận'; btn.style.background = 'var(--success)'; }
   showToast('✅ Đã ghi nhận! Boss sẽ xem xét và hoàn tiền cho khách.', 'success');
   // Reset toàn bộ form khách trả
   ['r1_orderId','r1_amount','r1_bankInfo','r1_qrPhoto','r1_photoShipper','r1_photoActual'].forEach(id => {
@@ -1435,14 +1441,18 @@ async function submitReturnCustomer() {
   });
 }
 
-async function submitReturnCarrier() {
+async function submitReturnCarrier(btn) {
   const count = document.getElementById('r2_count').value;
   const orderIds = document.getElementById('r2_orderIds').value.trim();
-  if (!count || !orderIds) { showToast('Vui lòng nhập đầy đủ thông tin!', 'danger'); return; }
+  if (!count || !orderIds) {
+    if (btn) { btn.disabled = false; btn.textContent = '📥 Ghi Nhận & Gửi Boss'; btn.style.background = ''; btn.style.color = ''; }
+    showToast('Vui lòng nhập đầy đủ thông tin!', 'danger'); return;
+  }
 
   const f1 = document.getElementById('r2_photoOrders').files[0];
   const pancakeFiles = Array.from(document.getElementById('r2_photoPancake').files);
-  showToast('⏳ Đang tải ảnh lên...', 'info');
+  const totalPhotos = (f1 ? 1 : 0) + pancakeFiles.length;
+  if (totalPhotos > 0 && btn) btn.textContent = `⏳ Đang tải ${totalPhotos} ảnh...`;
 
   async function uploadCarrierPhoto(file, label) {
     if (!file) return null;
@@ -1455,9 +1465,10 @@ async function submitReturnCarrier() {
   ]);
   const urlPancake = urlsPancake.filter(Boolean).join(',');
 
-  showSentFeedback(document.querySelector('button[onclick="submitReturnCarrier()"]'));
+  if (btn) btn.textContent = '⏳ Đang gửi Boss...';
   await apiCall('submitReturn', { empId: state.user.id, date: today(), type: 'carrier',
     count, orderIds, photoOrders: urlOrders, photoPancake: urlPancake });
+  if (btn) { btn.textContent = '✅ Đã Gửi / Chờ Xác Nhận'; btn.style.background = 'var(--success)'; }
   showToast('✅ Đã ghi nhận hàng vận chuyển hoàn về!', 'success');
   ['r2_count','r2_orderIds','r2_photoOrders','r2_photoPancake'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
