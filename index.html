@@ -738,8 +738,6 @@ function renderOverview() {
     const done = Object.values(r.checklist || {}).filter(Boolean).length;
     totalTasks += taskCount; doneTasks += done;
   });
-  document.getElementById('statTasksDone').textContent = `${doneTasks}/${totalTasks}`;
-
   // Supply overview
   renderSupplyOverview();
 }
