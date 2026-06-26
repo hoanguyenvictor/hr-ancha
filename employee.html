@@ -772,8 +772,14 @@ function renderHome() {
     mSt.textContent  = `✅ ${d.morningCheckin} → ${d.morningCheckout}`;
     mBtn.textContent = '✅ Hoàn thành'; mBtn.disabled = true;
   } else if (d.morningCheckin) {
-    mSt.textContent  = `✅ Vào: ${d.morningCheckin}`;
-    mBtn.textContent = '🏁 Check-out'; mBtn.style.color = 'var(--warning)';
+    const _nowM = new Date().getHours()*60 + new Date().getMinutes();
+    if (_nowM >= 12*60) {
+      mSt.textContent  = `✅ Vào: ${d.morningCheckin}`;
+      mBtn.textContent = '🔒 Đã qua 12:00'; mBtn.disabled = true; mBtn.style.background = '#9ca3af'; mBtn.style.color = 'white';
+    } else {
+      mSt.textContent  = `✅ Vào: ${d.morningCheckin}`;
+      mBtn.textContent = '🏁 Check-out'; mBtn.style.color = 'var(--warning)';
+    }
   } else {
     mSt.textContent = '08:00 – 12:00'; mBtn.textContent = '📍 Check-in'; mBtn.disabled = false;
   }
@@ -790,8 +796,14 @@ function renderHome() {
     aSt.textContent  = `✅ ${d.afternoonCheckin} → ${d.afternoonCheckout}`;
     aBtn.textContent = '✅ Hoàn thành'; aBtn.disabled = true;
   } else if (d.afternoonCheckin) {
-    aSt.textContent  = `✅ Vào: ${d.afternoonCheckin}`;
-    aBtn.textContent = '🏁 Check-out'; aBtn.style.color = 'var(--warning)';
+    const _nowA = new Date().getHours()*60 + new Date().getMinutes();
+    if (_nowA >= 17*60+30) {
+      aSt.textContent  = `✅ Vào: ${d.afternoonCheckin}`;
+      aBtn.textContent = '🔒 Đã qua 17:30'; aBtn.disabled = true; aBtn.style.background = '#9ca3af'; aBtn.style.color = 'white';
+    } else {
+      aSt.textContent  = `✅ Vào: ${d.afternoonCheckin}`;
+      aBtn.textContent = '🏁 Check-out'; aBtn.style.color = 'var(--warning)';
+    }
   } else {
     aSt.textContent = '13:00 – 17:30'; aBtn.textContent = '📍 Check-in'; aBtn.disabled = false;
   }
@@ -917,6 +929,9 @@ async function doShiftAction(shift) {
     if (shift === 'morning'   && (nowTotal < 7*60+30 || nowTotal >= 12*60))  { showToast('⏰ Ca sáng chỉ check-in từ 7:30 – 12:00', 'warning'); return; }
     if (shift === 'afternoon' && (nowTotal < 12*60+30 || nowTotal >= 18*60)) { showToast('⏰ Ca chiều chỉ check-in từ 12:30 – 18:00', 'warning'); return; }
     if (shift === 'evening'   && nowTotal < 19*60)                           { showToast('⏰ Ca tối chỉ check-in từ 19:00 trở đi', 'warning'); return; }
+  } else {
+    if (shift === 'morning'   && nowTotal >= 12*60)    { showToast('🔒 Đã qua 12:00 — không thể checkout ca sáng', 'warning'); return; }
+    if (shift === 'afternoon' && nowTotal >= 17*60+30) { showToast('🔒 Đã qua 17:30 — không thể checkout ca chiều', 'warning'); return; }
   }
 
   btn.disabled = true;
