@@ -1267,14 +1267,18 @@ async function submitShiftChecklist(shift) {
   ));
 
   const allTasks = [...MORNING_TASKS, ...AFTERNOON_TASKS];
-  const allDone = allTasks.filter(t => state.checklistState[t.id]).length;
   state.todayData.checklist = state.checklistState;
-  if (shift === 'morning') state.todayData.checklistMorningSubmitted = today();
-  else state.todayData.checklistAfternoonSubmitted = today();
+  if (shift === 'morning') {
+    state.todayData.checklistMorningSubmitted = today();
+    state.todayData.morningDoneCount = doneTasks.length; // lưu số việc sáng đã làm
+  } else {
+    state.todayData.checklistAfternoonSubmitted = today();
+  }
   localStorage.setItem(`todayData_${today()}`, JSON.stringify(state.todayData));
 
-  // Luôn gửi tổng cộng 10 tasks để boss diary hiện đúng X/10
-  const allDoneCount = allTasks.filter(t => state.checklistState[t.id]).length;
+  // Cộng việc sáng đã lưu + việc chiều vừa tick để tránh mất dữ liệu khi reload app
+  const morningDone = shift === 'afternoon' ? (state.todayData.morningDoneCount || 0) : 0;
+  const allDoneCount = shift === 'morning' ? doneTasks.length : morningDone + doneTasks.length;
   await apiCall('createSubmission', { empId: state.user.id, date: today(), shift, totalTasks: allTasks.length, doneTasks: allDoneCount });
 
   showToast(`✅ Đã gửi ${doneTasks.length}/${tasks.length} việc ${shift==='morning'?'ca sáng':'ca chiều'}!`, 'success');
