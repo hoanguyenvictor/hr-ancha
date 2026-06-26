@@ -128,7 +128,7 @@ function checkDailyAttendance() {
     // Kiểm tra từng ca
     if (needMorning && !leaveMorning) {
       if (!morningRow) {
-        addAutoPenalty(emp.id, date, 'Vắng mặt ca sáng', 'Không check-in ca sáng');
+        addAutoPenalty(emp.id, date, 'Không check-in ca sáng', 'Không check-in ca sáng');
         violations.push(`❌ ${emp.name} — Không check-in ca sáng`);
       } else if (!morningRow.checkoutTime) {
         addAutoPenalty(emp.id, date, 'Không check-out ca sáng', 'Không check-out ca sáng');
@@ -137,7 +137,7 @@ function checkDailyAttendance() {
     }
     if (needAfternoon && !leaveAfternoon) {
       if (!afternoonRow) {
-        addAutoPenalty(emp.id, date, 'Vắng mặt ca chiều', 'Không check-in ca chiều');
+        addAutoPenalty(emp.id, date, 'Không check-in ca chiều', 'Không check-in ca chiều');
         violations.push(`❌ ${emp.name} — Không check-in ca chiều`);
       } else if (!afternoonRow.checkoutTime) {
         addAutoPenalty(emp.id, date, 'Không check-out ca chiều', 'Không check-out ca chiều');
