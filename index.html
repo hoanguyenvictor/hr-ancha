@@ -1494,7 +1494,7 @@ function switchPage(name, btn) {
     if (navBtns[idx[name] ?? 0]) navBtns[idx[name] ?? 0].classList.add('active');
   }
   if (name === 'overview') { loadTodayReports().then(renderOverview); }
-  if (name === 'staff') { loadEmployees(); loadOvertimeList(); }
+  if (name === 'staff') { loadEmployees().then(renderEmployeeList); loadOvertimeList(); }
   if (name === 'schedule') renderScheduleTab();
   if (name === 'notifications') { loadLeaveRequests(); loadNotifications(); loadAttendanceReports(); }
   if (name === 'diary') { window._bossDiaryFilter = window._bossDiaryFilter || 'day'; loadBossDiary(); }
