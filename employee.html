@@ -1392,34 +1392,16 @@ function switchReturnType(type) {
   btnK.style.borderColor = type === 'carrier' ? 'var(--primary)' : 'var(--muted)';
 }
 
-let _returnConfirmPending = null;
 function confirmReturnSubmit(type) {
   const btnId = type === 'customer' ? 'btnReturnCustomerSubmit' : 'btnReturnCarrierSubmit';
   const btn = document.getElementById(btnId);
-  if (_returnConfirmPending !== type) {
-    // Lần 1: chuyển sang trạng thái xác nhận
-    _returnConfirmPending = type;
-    btn.textContent = '⚠️ Xác nhận gửi Boss?';
-    btn.style.background = '#ef4444';
-    btn.style.color = 'white';
-    setTimeout(() => {
-      if (_returnConfirmPending === type) {
-        _returnConfirmPending = null;
-        btn.textContent = '📥 Ghi Nhận & Gửi Boss';
-        btn.style.background = '';
-        btn.style.color = '';
-      }
-    }, 30000);
-  } else {
-    // Lần 2: thật sự gửi — lock nút ngay và truyền ref xuống
-    _returnConfirmPending = null;
-    btn.disabled = true;
-    btn.textContent = '⏳ Đang gửi...';
-    btn.style.background = '#6b7280';
-    btn.style.color = 'white';
-    if (type === 'customer') submitReturnCustomer(btn);
-    else submitReturnCarrier(btn);
-  }
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Đang gửi...';
+  btn.style.background = '#6b7280';
+  btn.style.color = 'white';
+  if (type === 'customer') submitReturnCustomer(btn);
+  else submitReturnCarrier(btn);
 }
 
 async function submitReturnCustomer(btn) {
