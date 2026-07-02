@@ -740,7 +740,7 @@ function renderHome() {
 
   const sched = d.scheduledShift || 'full';
 
-  // Ngày nghỉ — ẩn cả 2 nút, hiện thông báo nghỉ
+  // Ngày nghỉ — ẩn ca sáng/chiều nhưng vẫn hiện ca tối nếu có
   if (sched === 'off') {
     document.getElementById('morningBtn').closest('div').style.display  = 'none';
     document.getElementById('afternoonBtn').closest('div').style.display = 'none';
@@ -754,6 +754,27 @@ function renderHome() {
     }
     card.style.background = 'linear-gradient(135deg,#10b981,#059669)';
     if (ci) document.getElementById('statCheckin').textContent = '—';
+    // Vẫn kiểm tra và hiện ca tối nếu có đăng ký OT
+    const eveningBlockOff = document.getElementById('eveningShiftBlock');
+    const hasEveningOff = d.hasOT || d.eveningStart;
+    if (hasEveningOff && eveningBlockOff) {
+      eveningBlockOff.style.display = '';
+      const eBtn = document.getElementById('eveningBtn');
+      const eSt  = document.getElementById('eveningStatus');
+      const timeLabel = (d.eveningStart && d.eveningEnd) ? `${d.eveningStart} – ${d.eveningEnd}` : DB_CONFIG.EVENING_START + ' – ...';
+      if (d.eveningCheckin && d.eveningCheckout) {
+        eSt.textContent = `✅ ${d.eveningCheckin} → ${d.eveningCheckout}`;
+        eBtn.textContent = '✅ Hoàn thành'; eBtn.disabled = true;
+      } else if (d.eveningCheckin) {
+        eSt.textContent = `✅ Vào: ${d.eveningCheckin}`;
+        eBtn.textContent = '🏁 Check-out'; eBtn.style.color = 'var(--warning)';
+      } else {
+        eSt.textContent = timeLabel;
+        eBtn.textContent = '🏠 Check-in'; eBtn.disabled = false;
+      }
+    } else if (eveningBlockOff) {
+      eveningBlockOff.style.display = 'none';
+    }
     return;
   }
 
