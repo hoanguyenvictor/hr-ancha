@@ -17,6 +17,7 @@ const SS = SpreadsheetApp.getActiveSpreadsheet();
 // Telegram config
 const TG_TOKEN = '8847651571:AAHPzHQ1eAY6nzztrBoHiSBUnjoTqfDDnYU';
 const TG_CHAT_ID = '7094454303';
+const TG_GROUP_HTKHACH = '-1003960458303'; // ID nhóm Hỗ trợ khách hàng
 
 // ─── DAILY ATTENDANCE CHECK — chạy tự động 23h30 mỗi ngày ──────────
 // ─── NHẮC ĐĂNG KÝ LỊCH — chạy 15h, 19h, 22h Chủ Nhật ──
@@ -143,6 +144,21 @@ function checkDailyAttendance() {
         addAutoPenalty(emp.id, date, 'Không check-out ca chiều', 'Không check-out ca chiều');
         violations.push(`⚠️ ${emp.name} — Không check-out ca chiều`);
       }
+    }
+
+    // Kiểm tra checklist — không gửi trong giờ quy định → tự trừ 50k
+    const submissions = sheetData(SHEETS.SUBMISSIONS).filter(r =>
+      r.date === date && String(r.empId) === String(emp.id)
+    );
+    const morningSubmit   = submissions.find(r => r.shift === 'morning');
+    const afternoonSubmit = submissions.find(r => r.shift === 'afternoon');
+    if (needMorning && !leaveMorning && !morningSubmit) {
+      addAutoPenalty(emp.id, date, 'Checklist không hoàn thành', 'Không gửi checklist sáng trước 10:00');
+      violations.push(`📋 ${emp.name} — Không gửi checklist sáng`);
+    }
+    if (needAfternoon && !leaveAfternoon && !afternoonSubmit) {
+      addAutoPenalty(emp.id, date, 'Checklist không hoàn thành', 'Không gửi checklist chiều trước 18:00');
+      violations.push(`📋 ${emp.name} — Không gửi checklist chiều`);
     }
   });
 
@@ -891,7 +907,7 @@ function getPendingReturns(data) {
 }
 
 function confirmReturn(data) {
-  const { id, empId, approved, proofUrl } = data;
+  const { id, empId, approved, proofUrl, type } = data;
   const sheet = getSheet(SHEETS.RETURN_SUBS);
   const vals = sheet.getDataRange().getValues();
   const headers = vals[0];
@@ -911,7 +927,8 @@ function confirmReturn(data) {
   const emp = emps.find(e => e.id === empId);
   const empName = emp ? emp.name : empId;
   if (approved) {
-    sendTelegram(`✅ <b>Boss đã xác nhận hoàn tiền</b>\n👤 ${empName}\nVào tab 🔔 Thông Báo để tải ảnh xác nhận gửi khách.`);
+    const label = type === 'carrier' ? 'hoàn hàng' : 'hoàn tiền';
+    sendTelegram(`✅ <b>Boss đã xác nhận ${label}</b>\n👤 ${empName}\nVào tab 🔔 Thông Báo để tải ảnh xác nhận gửi khách.`);
   }
   return { ok: true };
 }
@@ -1218,6 +1235,78 @@ function getSalesBonus(data) {
   const { empId, month } = data;
   const row = sheetData(SHEETS.SALARY).find(r => r.empId === empId && r.month === month);
   return { ok: true, data: { amount: Number(row?.salesBonus) || 0 } };
+}
+
+// ─── GỬI BẢNG LƯƠNG CUỐI THÁNG ───────────────────────────────────
+function sendMonthlySalary() {
+  const tz = Session.getScriptTimeZone();
+  const now = new Date();
+  const month = Utilities.formatDate(now, tz, 'yyyy-MM');
+  const date  = Utilities.formatDate(now, tz, 'yyyy-MM-dd');
+  const otRate = 26000;
+
+  const employees = sheetData(SHEETS.EMPLOYEES).filter(e => e.role !== 'boss' && e.id);
+  let bossSummary = `📊 <b>TỔNG KẾT LƯƠNG THÁNG ${month}</b>\n${'─'.repeat(28)}\n`;
+
+  employees.forEach(emp => {
+    const deductions   = sheetData(SHEETS.DEDUCTIONS).filter(r => r.month === month && String(r.empId) === String(emp.id));
+    const { attendanceBonus, tasksBonus } = calcEmpBonus(deductions);
+    const empSalary    = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(emp.id) && s.month === month);
+    const salesBonus   = Number(empSalary?.salesBonus) || 0;
+    const baseSalary   = Number(emp.salary) || 0;
+    const otHours      = Math.round(calcOTHours(emp.id, month) * 10) / 10;
+    const otPay        = otHours * otRate;
+    const total        = baseSalary + attendanceBonus + tasksBonus + salesBonus + otPay;
+
+    const fmt = n => Number(n).toLocaleString('vi-VN');
+
+    const empMsg =
+      `📊 <b>BẢNG LƯƠNG THÁNG ${month}</b>\n` +
+      `👤 <b>${emp.name}</b>\n` +
+      `${'─'.repeat(28)}\n` +
+      `💼 Lương cơ bản: ${fmt(baseSalary)}đ\n` +
+      `🌙 Lương ngoài giờ (${otHours}h × 26.000đ): ${fmt(otPay)}đ\n` +
+      `⭐ Thưởng chuyên cần: ${fmt(attendanceBonus)}đ\n` +
+      `✅ Thưởng nhiệm vụ: ${fmt(tasksBonus)}đ\n` +
+      `🏆 Thưởng doanh số: ${fmt(salesBonus)}đ\n` +
+      `${'─'.repeat(28)}\n` +
+      `💰 <b>TỔNG NHẬN: ${fmt(total)}đ</b>\n` +
+      `📅 Chốt lương: ${date}`;
+
+    // Gửi vào app nhân viên
+    pushEmpNotification(emp.id, date, 'monthly_salary', empMsg);
+
+    // Gộp vào tổng kết cho Boss
+    bossSummary += `👤 ${emp.name}: <b>${fmt(total)}đ</b> (CB: ${fmt(baseSalary)} + OT: ${fmt(otPay)} + Thưởng: ${fmt(attendanceBonus+tasksBonus+salesBonus)})\n`;
+  });
+
+  // Gửi tổng kết cho Boss qua Telegram
+  sendTelegram(bossSummary);
+
+  // Nhắn nhóm Hỗ trợ khách hàng
+  const monthLabel = month.replace('-', '/');
+  const groupMsg = `Các em ơi, có bảng lương rồi.\nVào App check lương tháng ${monthLabel} nhé 🎉`;
+  try {
+    UrlFetchApp.fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ chat_id: TG_GROUP_HTKHACH, text: groupMsg })
+    });
+  } catch(e) { Logger.log('Telegram nhóm lỗi: ' + e.message); }
+
+  Logger.log('✅ Đã gửi bảng lương tháng ' + month);
+}
+
+// Chạy cuối tháng: kiểm tra nếu hôm nay là ngày cuối tháng thì gửi lương
+function checkEndOfMonth() {
+  const tz  = Session.getScriptTimeZone();
+  const now  = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  // Nếu tomorrow sang tháng mới → hôm nay là ngày cuối tháng
+  if (tomorrow.getMonth() !== today.getMonth()) {
+    sendMonthlySalary();
+  }
 }
 
 function confirmSalary(data) {
@@ -1690,6 +1779,7 @@ function setupAllTriggers() {
     'checkDailyAttendance',
     'remindScheduleRegistration',
     'dailyCleanup',
+    'checkEndOfMonth',
   ];
   // Xóa tất cả trigger cũ của các function này để tránh trùng
   ScriptApp.getProjectTriggers().forEach(t => {
@@ -1715,6 +1805,9 @@ function setupAllTriggers() {
 
   // 🧹 Dọn ảnh cũ: 2h sáng
   ScriptApp.newTrigger('dailyCleanup').timeBased().everyDays(1).atHour(2).create();
+
+  // 💰 Kiểm tra cuối tháng — gửi bảng lương: 23h (sau khi nhân viên đã checkout ca tối)
+  ScriptApp.newTrigger('checkEndOfMonth').timeBased().everyDays(1).atHour(23).create();
 
   Logger.log('✅ Đã tạo xong ' + ScriptApp.getProjectTriggers().length + ' triggers.');
 }

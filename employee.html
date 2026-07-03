@@ -725,9 +725,11 @@ async function loadTodayData() {
       // Giữ lại submitted flags từ localStorage (server không lưu các field này)
       const morningSubmitted = cached?.checklistMorningSubmitted;
       const afternoonSubmitted = cached?.checklistAfternoonSubmitted;
+      const morningDoneCount = cached?.morningDoneCount;
       state.todayData = res.data;
       if (morningSubmitted) state.todayData.checklistMorningSubmitted = morningSubmitted;
       if (afternoonSubmitted) state.todayData.checklistAfternoonSubmitted = afternoonSubmitted;
+      if (morningDoneCount != null) state.todayData.morningDoneCount = morningDoneCount;
       state.checklistState = res.data.checklist || {};
       localStorage.setItem(`todayData_${today()}`, JSON.stringify(state.todayData));
     }

@@ -1892,7 +1892,8 @@ async function confirmReturn(id, empId, isCustomer) {
       proofUrl = await uploadViaChunks(file, 'return_proof', `Ảnh CK hoàn - ${id}`, empId);
     }
   }
-  const res = await apiCall('confirmReturn', { id, empId, approved: true, proofUrl });
+  const type = isCustomer ? 'customer' : 'carrier';
+  const res = await apiCall('confirmReturn', { id, empId, approved: true, proofUrl, type });
   if (res.ok) {
     const msg = isCustomer ? '✅ Hoàn tiền cho khách thành công!' : '✅ Đã xác nhận hoàn — nhập kho OK!';
     showToast(msg, 'success');
