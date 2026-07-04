@@ -370,7 +370,7 @@ function initSheet(sheet, name) {
     [SHEETS.SALARY]:     ['empId','month','salesBonus','confirmed','confirmedAt'],
     [SHEETS.PINGS]:       ['empId','date','time','responded'],
     [SHEETS.LOGS]:        ['ts','action','detail'],
-    [SHEETS.SUBMISSIONS]:  ['id','empId','date','time','totalTasks','doneTasks','status','reviewedAt'],
+    [SHEETS.SUBMISSIONS]:  ['id','empId','date','shift','time','totalTasks','doneTasks','status','reviewedAt'],
     [SHEETS.RETURN_SUBS]: ['id','empId','date','time','type','orderId','amount','bankInfo','condition','photoShipper','photoActual','photoQR','count','orderIds','photoOrders','photoPancake','status','proofUrl','confirmedAt'],
     [SHEETS.ASSIGNED_TASKS]: ['id','empId','bossDate','desc','status','doneTime','doneNote'],
     [SHEETS.LEAVE_REQUESTS]: ['id','empId','date','shift','reason','photoUrl','status','approvedAt','approvedBy'],
@@ -1846,9 +1846,9 @@ function getMySupply(data) {
 
 // ─── SUBMISSIONS (Checklist confirmation) ─────────────────────────
 function createSubmission(data) {
-  const { empId, date, totalTasks, doneTasks } = data;
+  const { empId, date, shift, totalTasks, doneTasks } = data;
   const id = `SUB-${empId}-${date}-${Date.now()}`;
-  appendRow(SHEETS.SUBMISSIONS, { id, empId, date, time: new Date().toTimeString().slice(0,5), totalTasks, doneTasks, status: 'pending', reviewedAt: '' });
+  appendRow(SHEETS.SUBMISSIONS, { id, empId, date, shift: shift || '', time: new Date().toTimeString().slice(0,5), totalTasks, doneTasks, status: 'pending', reviewedAt: '' });
   const emps = sheetData(SHEETS.EMPLOYEES);
   const emp = emps.find(e => e.id === empId);
   const empName = emp ? emp.name : empId;
