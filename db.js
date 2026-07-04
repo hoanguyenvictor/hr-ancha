@@ -57,7 +57,7 @@ async function apiCall(action, data = {}) {
   const payload = { action, ...data };
   const url = DB_CONFIG.SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload));
   try {
-    const res = await fetch(url, { redirect: 'follow' });
+    const res = await fetch(url, { redirect: 'follow', keepalive: true });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     return await res.json();
   } catch (err) {

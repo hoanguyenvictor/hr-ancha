@@ -1299,8 +1299,17 @@ async function submitShiftChecklist(shift) {
   }
   localStorage.setItem(`todayData_${today()}`, JSON.stringify(state.todayData));
 
-  // Cộng việc sáng đã lưu + việc chiều vừa tick để tránh mất dữ liệu khi reload app
-  const morningDone = shift === 'afternoon' ? (state.todayData.morningDoneCount || 0) : 0;
+  // Lấy số việc sáng từ server (chính xác dù dùng 2 thiết bị)
+  let morningDone = 0;
+  if (shift === 'afternoon') {
+    try {
+      const subRes = await apiCall('getMySubmissions', { empId: state.user.id });
+      const morningSub = (subRes.data || []).find(r => r.date === today() && r.shift === 'morning');
+      morningDone = Number(morningSub?.doneTasks) || state.todayData.morningDoneCount || 0;
+    } catch(e) {
+      morningDone = state.todayData.morningDoneCount || 0;
+    }
+  }
   const allDoneCount = shift === 'morning' ? doneTasks.length : morningDone + doneTasks.length;
   await apiCall('createSubmission', { empId: state.user.id, date: today(), shift, totalTasks: allTasks.length, doneTasks: allDoneCount });
 
