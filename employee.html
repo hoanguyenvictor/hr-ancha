@@ -1373,6 +1373,12 @@ async function toggleOnBehalf() {
 }
 
 async function submitSupply() {
+  const missing = SUPPLY_ITEMS.filter(item => document.getElementById(`sup_${item.key}`)?.value === '');
+  if (missing.length > 0) {
+    showToast(`⚠️ Còn thiếu ${missing.length} mục chưa nhập số lượng: ${missing.map(m=>m.name).join(', ')}`, 'danger');
+    return;
+  }
+
   const data = {};
   let hasAlert = false;
   SUPPLY_ITEMS.forEach(item => {
