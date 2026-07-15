@@ -787,22 +787,30 @@ function buildAlerts() {
   const todayDayKey = ['sun','mon','tue','wed','thu','fri','sat'][new Date().getDay()];
   employees.forEach(emp => {
     const r = todayReports[emp.id] || {};
-    // Bỏ qua nếu nhân viên đăng ký nghỉ hôm nay
     const empSched = (weeklySchedule[emp.id] || {})[todayDayKey] || {};
     const shift = empSched.shift || 'fullday';
-    if (shift === 'off') return;
-    if (!r.checkin && hour >= 9) {
-      alerts.push({ type: 'danger', title: `${emp.name} chưa check-in`, desc: `Đã ${hour}h mà chưa vào làm`, empId: emp.id });
-    }
-    if (r.supply?.hasAlert) {
-      alerts.push({ type: 'warning', title: 'Dụng cụ kho sắp hết', desc: `${emp.name} báo cáo tồn kho thấp`, empId: emp.id });
-    }
-    if (hour >= 17) {
-      const pendingAfternoon = ['a1','a2','a3','a4','a5'].filter(id => !r.checklist?.[id]);
-      if (pendingAfternoon.length > 0) {
-        alerts.push({ type: 'warning', title: `${emp.name} chưa xong checklist chiều`, desc: `Còn ${pendingAfternoon.length} việc`, empId: emp.id });
+    // Nghỉ cả ngày (off) VẪN có thể đăng ký tăng ca tối → chỉ bỏ qua hẳn khi nghỉ mà KHÔNG đăng ký tối
+    const hasEvening = !!(empSched.eveningStart || empSched.hasOT === true || empSched.hasOT === 'true' || shift === 'evening');
+    const isOff = shift === 'off';
+    if (isOff && !hasEvening) return;
+
+    // --- Cảnh báo ca NGÀY: bỏ qua nếu hôm nay nghỉ ---
+    if (!isOff) {
+      if (!r.checkin && hour >= 9) {
+        alerts.push({ type: 'danger', title: `${emp.name} chưa check-in`, desc: `Đã ${hour}h mà chưa vào làm`, empId: emp.id });
+      }
+      if (r.supply?.hasAlert) {
+        alerts.push({ type: 'warning', title: 'Dụng cụ kho sắp hết', desc: `${emp.name} báo cáo tồn kho thấp`, empId: emp.id });
+      }
+      if (hour >= 17) {
+        const pendingAfternoon = ['a1','a2','a3','a4','a5'].filter(id => !r.checklist?.[id]);
+        if (pendingAfternoon.length > 0) {
+          alerts.push({ type: 'warning', title: `${emp.name} chưa xong checklist chiều`, desc: `Còn ${pendingAfternoon.length} việc`, empId: emp.id });
+        }
       }
     }
+
+    // --- Cảnh báo ca TỐI: luôn kiểm tra, kể cả người nghỉ ngày nhưng đăng ký làm tối ---
     if (r.pingMiss) {
       alerts.push({ type: 'danger', title: `${emp.name} không phản hồi ping`, desc: `Ca tối — không xác nhận đang làm`, empId: emp.id });
     }

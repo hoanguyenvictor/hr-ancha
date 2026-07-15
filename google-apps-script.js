@@ -60,7 +60,9 @@ function notifyBossShiftSummary() {
   const allSched = sheetData(SHEETS.SCHEDULE).filter(r => r.date === date);
   const latestMap = {};
   allSched.forEach(r => { latestMap[String(r.empId)] = r; }); // ghi đè → giữ dòng cuối
-  const schedules = Object.values(latestMap).filter(r => r.shift !== 'off');
+  // Nghỉ cả ngày (off) VẪN có thể đăng ký tăng ca tối → chỉ loại 'off' khi họ không đăng ký ca tối
+  const hasEvening = r => !!(r.eveningStart && String(r.eveningStart).trim() !== '') || r.shift === 'evening';
+  const schedules = Object.values(latestMap).filter(r => r.shift !== 'off' || hasEvening(r));
   const employees = sheetData(SHEETS.EMPLOYEES).filter(e => e.role !== 'boss');
 
   let shiftFilter, label;
@@ -71,15 +73,15 @@ function notifyBossShiftSummary() {
     shiftFilter = r => r.shift === 'afternoon' || r.shift === 'fullday' || r.shift === 'full';
     label = '🌆 Ca Chiều hôm nay';
   } else {
-    shiftFilter = r => !!(r.eveningStart && String(r.eveningStart).trim() !== '') || r.shift === 'evening';
+    shiftFilter = hasEvening;
     label = '🌙 Tăng Ca Tối hôm nay';
   }
 
   const working = schedules.filter(shiftFilter).map(r => {
     const emp = employees.find(e => String(e.id) === String(r.empId));
     const name = emp ? emp.name : r.empId;
-    const ot = (String(r.hasOT) === 'true' && r.eveningStart)
-      ? ` + 🌙 ${r.eveningStart}–${r.eveningEnd}` : '';
+    // SCHEDULE sheet không có cột hasOT → phải đọc trực tiếp eveningStart
+    const ot = r.eveningStart ? ` + 🌙 ${r.eveningStart}–${r.eveningEnd}` : '';
     return `👤 ${name}${ot}`;
   });
 
