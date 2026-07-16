@@ -65,7 +65,7 @@ function notifyBossShiftSummary() {
   const schedules = Object.values(latestMap).filter(r => r.shift !== 'off' || hasEvening(r));
   const employees = sheetData(SHEETS.EMPLOYEES).filter(e => e.role !== 'boss');
 
-  let shiftFilter, label;
+  let shiftFilter, label, isEveningMsg = false;
   if (hour < 10) {
     shiftFilter = r => r.shift === 'morning' || r.shift === 'fullday' || r.shift === 'full';
     label = '☀️ Ca Sáng hôm nay';
@@ -75,13 +75,15 @@ function notifyBossShiftSummary() {
   } else {
     shiftFilter = hasEvening;
     label = '🌙 Tăng Ca Tối hôm nay';
+    isEveningMsg = true;
   }
 
   const working = schedules.filter(shiftFilter).map(r => {
     const emp = employees.find(e => String(e.id) === String(r.empId));
     const name = emp ? emp.name : r.empId;
-    // SCHEDULE sheet không có cột hasOT → phải đọc trực tiếp eveningStart
-    const ot = r.eveningStart ? ` + 🌙 ${r.eveningStart}–${r.eveningEnd}` : '';
+    // Giờ tăng ca CHỈ hiện trong tin ca tối — tin sáng/chiều không dán giờ tối vào
+    // (SCHEDULE sheet không có cột hasOT → đọc trực tiếp eveningStart)
+    const ot = (isEveningMsg && r.eveningStart) ? ` · 🌙 ${r.eveningStart}–${r.eveningEnd}` : '';
     return `👤 ${name}${ot}`;
   });
 
