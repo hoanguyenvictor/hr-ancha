@@ -188,7 +188,7 @@ function notifyDailySalaryUpdate(employees, date, month) {
     const deductions = sheetData(SHEETS.DEDUCTIONS).filter(r =>
       String(r.empId) === String(emp.id) && r.month === month
     );
-    const { attendanceBonus, tasksBonus } = calcEmpBonus(deductions);
+    const { attendanceBonus, tasksBonus } = calcEmpBonus(deductions, emp);
     const empSalary = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(emp.id) && s.month === month);
     const salesBonus  = Number(empSalary?.salesBonus) || 0;
     const baseSalary  = Number(emp.salary) || 0;
@@ -362,7 +362,7 @@ function getSheet(name) {
 
 function initSheet(sheet, name) {
   const headers = {
-    [SHEETS.EMPLOYEES]:  ['id','name','phone','salary','color','created','passHash'],
+    [SHEETS.EMPLOYEES]:  ['id','name','phone','salary','color','created','passHash','eveningOnly'],
     [SHEETS.CHECKIN]:    ['empId','date','shift','checkinTime','checkoutTime','lat','lng','late','lateMin','approved'],
     [SHEETS.CHECKLIST]:  ['empId','date','taskId','done','doneTime'],
     [SHEETS.SUPPLY]:     ['empId','date','time','carton_nap_gap_35x25x7','carton_nap_gap_20x15x6','carton_doi_khau_40x30x20','carton_doi_khau_35x25x15','carton_doi_khau_12x12x12','hop_dong_ho','hop_vong_tay','bang_dinh','xop_60cm','xop_40cm','giay_in_don','decan_noi','decan_vanh','decan_vua','giay_nen_vua','hasAlert','reportedBy','onBehalfOf'],
@@ -960,12 +960,25 @@ function startShift(data) {
   if (!found) {
     appendRow(SHEETS.OVERTIME, { id: uid(), empId, date, start: startTime, status: 'active' });
   }
+  // Thông báo Telegram + app cho boss
+  const emp = sheetData(SHEETS.EMPLOYEES).find(e => String(e.id) === String(empId));
+  const empName = emp ? emp.name : empId;
+  sendTelegram(`📍 <b>Check-in</b>\n👤 ${empName}\n🌙 Ca tối · ${startTime} ✅\n📅 ${date}`);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let nSheet = ss.getSheetByName('BossNotifications');
+  if (!nSheet) { nSheet = ss.insertSheet('BossNotifications'); nSheet.appendRow(['date','type','message','read']); }
+  nSheet.appendRow([date, 'checkin', `📍 ${empName} check-in 🌙 Ca tối lúc ${startTime} ✅`, 'false']);
   return { ok: true };
 }
 
 function endShift(data) {
   const { empId, date, endTime, hours } = data;
   updateRow(SHEETS.OVERTIME, 'empId', empId, { status: 'done', end: endTime, hours });
+  // Thông báo Telegram cho boss
+  const emp = sheetData(SHEETS.EMPLOYEES).find(e => String(e.id) === String(empId));
+  const empName = emp ? emp.name : empId;
+  const hNum = Number(hours) || 0;
+  sendTelegram(`🏁 <b>Check-out</b>\n👤 ${empName}\n🌙 Ca tối · ${endTime}\n⏱ ${hNum.toFixed(1)}h × 26.000đ = ${Math.round(hNum*26000).toLocaleString('vi-VN')}đ\n📅 ${date}`);
   return { ok: true };
 }
 
@@ -1069,7 +1082,14 @@ function calcOTHours(empId, month) {
 }
 
 // Tính bonus/deduction cho 1 nhân viên
-function calcEmpBonus(empDeductions) {
+// emp (tùy chọn): nếu emp.eveningOnly là TRUE → NV chỉ làm ca tối, không có thưởng
+// chuyên cần & thưởng nhiệm vụ (vì không check-in ca ngày, không làm checklist)
+function calcEmpBonus(empDeductions, emp) {
+  const eveningOnly = emp && (emp.eveningOnly === true ||
+    String(emp.eveningOnly).toUpperCase() === 'TRUE' || String(emp.eveningOnly) === '1');
+  if (eveningOnly) {
+    return { attendanceBonus: 0, tasksBonus: 0 };
+  }
   const attDeduct = empDeductions.filter(d => d.reason && (
     d.reason.includes('late') || d.reason.includes('early') ||
     d.reason.includes('absent') || d.reason.includes('Đi muộn') ||
@@ -1097,7 +1117,7 @@ function getSalaryData(data) {
     const empDeductions = deductions.filter(d => String(d.empId) === String(emp.id));
     const empSalary = salaries.find(s => String(s.empId) === String(emp.id));
     const otHours = calcOTHours(emp.id, month);
-    const { attendanceBonus, tasksBonus: taskBonus } = calcEmpBonus(empDeductions);
+    const { attendanceBonus, tasksBonus: taskBonus } = calcEmpBonus(empDeductions, emp);
 
     result[emp.id] = {
       baseSalary: Number(emp.salary) || 0,
@@ -1118,10 +1138,9 @@ function getEmpSalaryDetail(data) {
   const deductions = sheetData(SHEETS.DEDUCTIONS).filter(r =>
     r.month === month && String(r.empId) === String(empId)
   );
-  const { attendanceBonus, tasksBonus } = calcEmpBonus(deductions);
-
   // Lương cơ bản & thưởng doanh số
   const emp = sheetData(SHEETS.EMPLOYEES).find(e => String(e.id) === String(empId));
+  const { attendanceBonus, tasksBonus } = calcEmpBonus(deductions, emp);
   const baseSalary = Number(emp?.salary) || 0;
   const empSalary  = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(empId) && s.month === month);
   const salesBonus = Number(empSalary?.salesBonus) || 0;
@@ -1254,7 +1273,7 @@ function sendMonthlySalary() {
 
   employees.forEach(emp => {
     const deductions   = sheetData(SHEETS.DEDUCTIONS).filter(r => r.month === month && String(r.empId) === String(emp.id));
-    const { attendanceBonus, tasksBonus } = calcEmpBonus(deductions);
+    const { attendanceBonus, tasksBonus } = calcEmpBonus(deductions, emp);
     const empSalary    = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(emp.id) && s.month === month);
     const salesBonus   = Number(empSalary?.salesBonus) || 0;
     const baseSalary   = Number(emp.salary) || 0;
