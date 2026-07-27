@@ -684,14 +684,9 @@ async function init() {
   loadOvertimeList();
   updateEmpNotifBadge();
 
-  // Check ca tối đang chạy
-  const shiftData = JSON.parse(localStorage.getItem('activeShift') || 'null');
-  if (shiftData) {
-    state.shiftStart = new Date(shiftData.start);
-    showActiveShift();
-    startShiftTimer();
-    schedulePing();
-  }
+  // Cơ chế "Bắt đầu ca tối" cũ đã bỏ — xoá state sót lại để không hiện đồng hồ ma.
+  // NV ca tối dùng nút Check-in / Check-out ở thẻ chính.
+  localStorage.removeItem('activeShift');
 
   // Đặt ngày mặc định cho đăng ký OT
   document.getElementById('otDate').value = today();
@@ -1667,34 +1662,12 @@ async function renderSchedule() {
       </div>`;
   }
 
-  // Card ca ngoài giờ hôm nay
-  const todayDate = today();
-  const todayIdx = dates.indexOf(todayDate);
-  const todaySchedule = todayIdx >= 0 ? (schedule[DAY_KEYS[todayIdx]] || {}) : {};
+  // Card ca ngoài giờ hôm nay — ĐÃ ẨN.
+  // Nút "Bắt đầu ca / Kết thúc ca" gây nhầm cho NV ca tối. Thay vào đó, NV ca tối
+  // dùng nút Check-in / Check-out ở thẻ chính (thẻ tím trên màn hình Home) →
+  // ghi giờ vào Schedule chuẩn theo NGÀY + báo Telegram cho Boss.
   const otCard = document.getElementById('otShiftCard');
-
-  if (todaySchedule.hasOT) {
-    otCard.style.display = 'block';
-    const rate = getOTRate(todayDate);
-    const holiday = isHoliday(todayDate);
-    document.getElementById('otShiftInfo').textContent =
-      `${todaySchedule.eveningStart||'—'} – ${todaySchedule.eveningEnd||'—'} | ${todaySchedule.plannedHours||0}h dự kiến × ${formatVND(rate)}/giờ${holiday ? ' 🎌 ×2' : ''}`;
-    // Restore state nếu đã bắt đầu
-    const otState = JSON.parse(localStorage.getItem(`otState_${todayDate}`) || 'null');
-    if (otState?.done) {
-      showOTState('done');
-      document.getElementById('otDoneSummary').textContent =
-        `✅ ${otState.hours}h thực tế · ${formatVND(otState.hours * rate)}`;
-    } else if (otState?.startTime) {
-      state.otStart = new Date(otState.startTime);
-      showOTState('running');
-      startOTTimer();
-    } else {
-      showOTState('idle');
-    }
-  } else {
-    otCard.style.display = 'none';
-  }
+  if (otCard) otCard.style.display = 'none';
 }
 
 let otTimerInterval = null;
