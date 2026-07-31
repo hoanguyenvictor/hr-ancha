@@ -1109,6 +1109,30 @@ function calcEmpBonus(empDeductions, emp) {
 // 2026-07-01 → sheetData trả '2026-07-01' → so === '2026-07' bị trượt. Cắt 7 ký tự đầu.
 function monthEq(v, month) { return String(v).slice(0, 7) === String(month); }
 
+// ⚙️ CHẠY 1 LẦN TỪ EDITOR: miễn toàn bộ khoản trừ TỰ ĐỘNG của 1 tháng.
+// Lý do: tháng 7/2026 hệ thống còn lỗi (checklist thiếu cột shift, tháng-dạng-ngày)
+// → phạt oan hàng loạt. Xoá sạch cho công bằng, từ tháng 8 chạy đúng.
+// Chọn hàm này trong editor → Run. Đổi biến 'month' nếu cần tháng khác.
+function clearMonthPenalties() {
+  const month = '2026-07'; // ← đổi tháng ở đây nếu cần
+  const tz = Session.getScriptTimeZone();
+  const norm = v => (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM') : String(v).slice(0, 7);
+  const sheet = getSheet(SHEETS.DEDUCTIONS);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const monthIdx = headers.indexOf('month');
+  const dateIdx = headers.indexOf('date');
+  let deleted = 0;
+  // Xoá từ dưới lên để không lệch chỉ số dòng
+  for (let i = vals.length - 1; i >= 1; i--) {
+    const mMatch = monthIdx >= 0 && norm(vals[i][monthIdx]) === month;
+    const dMatch = dateIdx >= 0 && norm(vals[i][dateIdx]) === month;
+    if (mMatch || dMatch) { sheet.deleteRow(i + 1); deleted++; }
+  }
+  Logger.log('✅ Đã xoá ' + deleted + ' khoản trừ của tháng ' + month);
+  return deleted;
+}
+
 function getSalaryData(data) {
   const { month } = data;
   const employees = sheetData(SHEETS.EMPLOYEES);
