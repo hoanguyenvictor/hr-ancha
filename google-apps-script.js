@@ -1155,14 +1155,32 @@ function getEmpSalaryDetail(data) {
 
 function saveSalesBonus(data) {
   const { month, bonuses } = data;
-  const today = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const tz = Session.getScriptTimeZone();
+  const today = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+  const sheet = getSheet(SHEETS.SALARY);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const empIdx = headers.indexOf('empId');
+  const monthIdx = headers.indexOf('month');
+  const sbIdx = headers.indexOf('salesBonus');
+  // Chuẩn hoá tháng để so khớp (ô tháng có thể là chuỗi '2026-07', '2026-07-01', hoặc Date)
+  const norm = v => (v instanceof Date) ? Utilities.formatDate(v, tz, 'yyyy-MM') : String(v).slice(0, 7);
   Object.entries(bonuses).forEach(([empId, amount]) => {
-    const found = updateRow(SHEETS.SALARY, 'empId', empId, { salesBonus: amount });
-    if (!found) appendRow(SHEETS.SALARY, { empId, month, salesBonus: amount, confirmed: 'FALSE' });
+    const amt = Number(amount) || 0;
+    // Khớp theo CẢ empId VÀ tháng (trước đây chỉ khớp empId → ghi đè lộn dòng tháng khác)
+    let found = false;
+    for (let i = 1; i < vals.length; i++) {
+      if (String(vals[i][empIdx]) === String(empId) && norm(vals[i][monthIdx]) === String(month)) {
+        sheet.getRange(i + 1, sbIdx + 1).setValue(amt);
+        found = true;
+        break;
+      }
+    }
+    if (!found) appendRow(SHEETS.SALARY, { empId, month, salesBonus: amt, confirmed: 'FALSE' });
     // Gửi thông báo cho nhân viên
-    if (Number(amount) > 0) {
+    if (amt > 0) {
       pushEmpNotification(empId, today, 'sales_bonus',
-        `🏆 Boss đã ghi nhận thưởng doanh số tháng ${month} cho bạn: ${Number(amount).toLocaleString('vi-VN')}đ`);
+        `🏆 Boss đã ghi nhận thưởng doanh số tháng ${month} cho bạn: ${amt.toLocaleString('vi-VN')}đ`);
     }
   });
   return { ok: true };

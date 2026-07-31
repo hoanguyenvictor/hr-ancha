@@ -1113,7 +1113,7 @@ function renderSalaryTab() {
     const existing = salaryData[emp.id]?.salesBonus || '';
     return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
       <div style="flex:1;font-size:0.88rem;font-weight:600">${emp.name}</div>
-      <input type="number" id="sales_${emp.id}" value="${existing}" placeholder="1000000"
+      <input type="text" inputmode="numeric" id="sales_${emp.id}" value="${existing}" placeholder="1000000"
         style="width:140px;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:0.88rem;text-align:right">
       <span style="font-size:0.78rem;color:var(--muted)">đ</span>
     </div>`;
@@ -1171,8 +1171,9 @@ function salaryLine(label, amount, isDanger=false) {
 async function saveSalesBonus() {
   const bonuses = {};
   employees.forEach(emp => {
-    const val = document.getElementById(`sales_${emp.id}`)?.value;
-    if (val) bonuses[emp.id] = Number(val);
+    const raw = document.getElementById(`sales_${emp.id}`)?.value || '';
+    const num = Number(String(raw).replace(/[^\d]/g, '')); // bỏ chấm/phẩy/khoảng trắng → chỉ giữ số
+    if (num > 0) bonuses[emp.id] = num;
   });
   await apiCall('saveSalesBonus', { month: monthKey(), bonuses });
   showToast('✅ Đã lưu thưởng doanh số!', 'success');
