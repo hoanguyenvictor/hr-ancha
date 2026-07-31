@@ -186,10 +186,10 @@ function notifyDailySalaryUpdate(employees, date, month) {
   const otRate = 26000;
   employees.forEach(emp => {
     const deductions = sheetData(SHEETS.DEDUCTIONS).filter(r =>
-      String(r.empId) === String(emp.id) && r.month === month
+      String(r.empId) === String(emp.id) && monthEq(r.month, month)
     );
     const { attendanceBonus, tasksBonus } = calcEmpBonus(deductions, emp);
-    const empSalary = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(emp.id) && s.month === month);
+    const empSalary = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(emp.id) && monthEq(s.month, month));
     const salesBonus  = Number(empSalary?.salesBonus) || 0;
     const baseSalary  = Number(emp.salary) || 0;
     const otHours = calcOTHours(emp.id, month);
@@ -1105,11 +1105,15 @@ function calcEmpBonus(empDeductions, emp) {
 }
 
 // ─── SALARY ───────────────────────────────────────────────────────
+// So khớp tháng chịu được ô Date: Google Sheets có thể lưu '2026-07' thành ngày
+// 2026-07-01 → sheetData trả '2026-07-01' → so === '2026-07' bị trượt. Cắt 7 ký tự đầu.
+function monthEq(v, month) { return String(v).slice(0, 7) === String(month); }
+
 function getSalaryData(data) {
   const { month } = data;
   const employees = sheetData(SHEETS.EMPLOYEES);
-  const deductions = sheetData(SHEETS.DEDUCTIONS).filter(r => r.month === month);
-  const salaries = sheetData(SHEETS.SALARY).filter(r => r.month === month);
+  const deductions = sheetData(SHEETS.DEDUCTIONS).filter(r => monthEq(r.month, month));
+  const salaries = sheetData(SHEETS.SALARY).filter(r => monthEq(r.month, month));
   const checkins = sheetData(SHEETS.CHECKIN).filter(r => r.date && r.date.startsWith(month));
 
   const result = {};
@@ -1136,13 +1140,13 @@ function getSalaryData(data) {
 function getEmpSalaryDetail(data) {
   const { empId, month } = data;
   const deductions = sheetData(SHEETS.DEDUCTIONS).filter(r =>
-    r.month === month && String(r.empId) === String(empId)
+    monthEq(r.month, month) && String(r.empId) === String(empId)
   );
   // Lương cơ bản & thưởng doanh số
   const emp = sheetData(SHEETS.EMPLOYEES).find(e => String(e.id) === String(empId));
   const { attendanceBonus, tasksBonus } = calcEmpBonus(deductions, emp);
   const baseSalary = Number(emp?.salary) || 0;
-  const empSalary  = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(empId) && s.month === month);
+  const empSalary  = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(empId) && monthEq(s.month, month));
   const salesBonus = Number(empSalary?.salesBonus) || 0;
 
   // Giờ tăng ca (dùng helper chung: actualHours > 0, ngày lễ ×2, cộng Overtime cũ)
@@ -1274,7 +1278,7 @@ function markEmpNotifRead(data) {
 
 function getSalesBonus(data) {
   const { empId, month } = data;
-  const row = sheetData(SHEETS.SALARY).find(r => r.empId === empId && r.month === month);
+  const row = sheetData(SHEETS.SALARY).find(r => r.empId === empId && monthEq(r.month, month));
   return { ok: true, data: { amount: Number(row?.salesBonus) || 0 } };
 }
 
@@ -1290,9 +1294,9 @@ function sendMonthlySalary() {
   let bossSummary = `📊 <b>TỔNG KẾT LƯƠNG THÁNG ${month}</b>\n${'─'.repeat(28)}\n`;
 
   employees.forEach(emp => {
-    const deductions   = sheetData(SHEETS.DEDUCTIONS).filter(r => r.month === month && String(r.empId) === String(emp.id));
+    const deductions   = sheetData(SHEETS.DEDUCTIONS).filter(r => monthEq(r.month, month) && String(r.empId) === String(emp.id));
     const { attendanceBonus, tasksBonus } = calcEmpBonus(deductions, emp);
-    const empSalary    = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(emp.id) && s.month === month);
+    const empSalary    = sheetData(SHEETS.SALARY).find(s => String(s.empId) === String(emp.id) && monthEq(s.month, month));
     const salesBonus   = Number(empSalary?.salesBonus) || 0;
     const baseSalary   = Number(emp.salary) || 0;
     const otHours      = Math.round(calcOTHours(emp.id, month) * 10) / 10;
@@ -1353,12 +1357,27 @@ function checkEndOfMonth() {
 function confirmSalary(data) {
   const { month } = data;
   const employees = sheetData(SHEETS.EMPLOYEES);
+  const sheet = getSheet(SHEETS.SALARY);
+  const vals = sheet.getDataRange().getValues();
+  const headers = vals[0];
+  const empIdx = headers.indexOf('empId');
+  const monthIdx = headers.indexOf('month');
+  const confIdx = headers.indexOf('confirmed');
+  const confAtIdx = headers.indexOf('confirmedAt');
+  const at = new Date().toISOString();
   employees.forEach(emp => {
-    const found = updateRow(SHEETS.SALARY, 'empId', emp.id, {
-      confirmed: 'TRUE', confirmedAt: new Date().toISOString()
-    });
+    // Khớp CẢ empId + tháng (trước đây chỉ khớp empId → chốt nhầm dòng tháng khác)
+    let found = false;
+    for (let i = 1; i < vals.length; i++) {
+      if (String(vals[i][empIdx]) === String(emp.id) && monthEq(vals[i][monthIdx], month)) {
+        if (confIdx >= 0)   sheet.getRange(i + 1, confIdx + 1).setValue('TRUE');
+        if (confAtIdx >= 0) sheet.getRange(i + 1, confAtIdx + 1).setValue(at);
+        found = true;
+        break;
+      }
+    }
     if (!found) appendRow(SHEETS.SALARY, {
-      empId: emp.id, month, salesBonus: 0, confirmed: 'TRUE', confirmedAt: new Date().toISOString()
+      empId: emp.id, month, salesBonus: 0, confirmed: 'TRUE', confirmedAt: at
     });
   });
   log('SALARY_CONFIRMED', `Tháng ${month} đã chốt lương`);
