@@ -750,7 +750,10 @@ function renderHome() {
       card.appendChild(msg);
     }
     card.style.background = 'linear-gradient(135deg,#10b981,#059669)';
-    if (ci) document.getElementById('statCheckin').textContent = '—';
+    // Giờ vào: hiện giờ check-in ca tối nếu có, không thì '—'. (Trước đây dùng biến 'ci'
+    // khai báo mãi cuối hàm → lỗi TDZ 'Cannot access ci before initialization' → crash
+    // renderHome cho NV nghỉ ngày → mất nút Check-in ca tối. Đã sửa.)
+    document.getElementById('statCheckin').textContent = d.eveningCheckin || '—';
     // Vẫn kiểm tra và hiện ca tối nếu có đăng ký OT
     const eveningBlockOff = document.getElementById('eveningShiftBlock');
     const hasEveningOff = d.hasOT || d.eveningStart;
